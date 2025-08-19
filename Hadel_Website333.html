@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hadel Water</title>
+
+<!-- Google Font -->
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet">
+
+<style>
+/* Reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Poppins', sans-serif;
+  font-size: 18px;
+  color: #222;
+  background: linear-gradient(to right, #c9d6ff, #e2e2e2);
+  line-height: 1.6;
+}
+
+/* Navbar */
+nav {
+  background: #111;
+  color: #fff;
+  padding: 15px 40px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+nav .logo {
+  font-weight: 700;
+  font-size: 24px;
+  text-transform: uppercase;
+}
+
+nav ul {
+  list-style: none;
+  display: flex;
+  gap: 25px;
+}
+
+nav ul li a {
+  text-decoration: none;
+  color: #fff;
+  transition: color 0.3s;
+}
+
+nav ul li a:hover {
+  color: #00aaff;
+}
+
+/* Hero Section */
+.hero {
+  background: url('images/Water.png') center/cover no-repeat;
+  color: white;
+  text-align: center;
+  padding: 140px 20px;
+  position: relative;
+}
+
+.hero::after {
+  content: "";
+  position: absolute;
+  top:0; left:0; right:0; bottom:0;
+  background: rgba(0,0,0,0.5);
+}
+
+.hero-content {
+  position: relative;
+  z-index: 1;
+}
+
+.hero h1 {
+  font-size: 70px;
+  margin-bottom: 20px;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+}
+
+.hero p {
+  font-size: 22px;
+  max-width: 700px;
+  margin: 0 auto 30px;
+}
+
+.hero .button {
+  padding: 14px 30px;
+  background: #0077ff;
+  color: white;
+  text-decoration: none;
+  border-radius: 8px;
+  transition: background 0.3s;
+}
+
+.hero .button:hover {
+  background: #0056cc;
+}
+
+/* Section */
+section {
+  padding: 70px 20px;
+  max-width: 1100px;
+  margin: auto;
+}
+
+h2 {
+  font-size: 36px;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+/* About */
+.about p {
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+/* Gallery */
+.img-gallery {
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-top: 30px;
+}
+
+.img-gallery img {
+  border-radius: 15px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+  max-width: 100%;
+  height: auto;
+}
+
+/* Trailer */
+.trailer {
+  text-align: center;
+}
+
+.trailer iframe {
+  width: 80%;
+  height: 500px;
+  max-width: 900px;
+  border-radius: 15px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+
+/* Countdown */
+#countdown {
+  font-size: 30px;
+  margin-top: 20px;
+  font-weight: bold;
+  color: #0077ff;
+}
+
+/* Footer */
+footer {
+  text-align: center;
+  padding: 25px;
+  background: #111;
+  color: #fff;
+  margin-top: 40px;
+}
+</style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav>
+  <div class="logo">Hadel Water</div>
+  <ul>
+    <li><a href="#about">About</a></li>
+    <li><a href="#gallery">Gallery</a></li>
+    <li><a href="#trailer">Trailer</a></li>
+    <li><a href="#updates">Updates</a></li>
+	    <li><a href="#teasers">teasers</a></li>
+  </ul>
+</nav>
+
+<!-- Hero Section -->
+<header class="hero">
+  <div class="hero-content">
+    <h1>Hadel Water</h1>
+    <p>An open-world fishing adventure across uncharted seas.</p>
+    <a href="#updates" class="button">See Updates</a>
+  </div>
+</header>
+
+<!-- About Section -->
+<section id="about" class="about">
+  <h2>About the Game</h2>
+  <p>
+    Hadel Water is an open-world fishing adventure where you can explore vast and 
+    uncharted seas teeming with countless species of fish, from tiny schools that 
+    shimmer just beneath the surface to rare and exotic catches hidden in the depths.
+  </p>
+  <p>
+    Face massive beasts rising from the abyss to challenge your survival, gather 
+    wealth, uncover secrets, and upgrade your boat and gear to conquer both the 
+    waters and the monsters that dwell within them.
+  </p>
+</section>
+
+<!-- Gallery Section -->
+<section id="gallery">
+  <h2>Gallery</h2>
+  <div class="img-gallery">
+    <img src="images/Water.png" alt="Ocean Scene">
+
+
+    <!-- Renamed images -->
+    <img src="images/image.png" alt="Image">
+    <img src="images/image2.png" alt="Gallery Image 2">
+    <img src="images/image3.png" alt="Gallery Image 3">
+  </div>
+</section>
+
+<!-- Trailer Section -->
+<section id="trailer" class="trailer">
+  <h2>Game Trailer</h2>
+  <iframe src="https://www.youtube.com/embed/VIDEO_ID" 
+          title="Hadel Water Trailer" 
+          frameborder="0" 
+          allowfullscreen></iframe>
+</section>
+
+<!-- Updates Section with Countdown -->
+<section id="updates" style="text-align:center;">
+  <h2>Game Release Countdown</h2>
+  <p>Exciting features and new content coming soon!</p>
+  <a href="https://docs.google.com/document/d/17PLA39jjsshpN8evMBiqBXbOHgvwdhtimQd9vyz6NnA/edit?tab=t.0" class="button">
+    View Updates
+  </a>
+
+  <div id="countdown"></div>
+</section>
+
+<script>
+// Countdown target date: Monday, 18 August 2028
+const countDownDate = new Date("Aug 18, 2028 00:00:00").getTime();
+
+// Update countdown every 1 second
+const countdownFunction = setInterval(function() {
+  const now = new Date().getTime();
+  const distance = countDownDate - now;
+
+  if (distance < 0) {
+    clearInterval(countdownFunction);
+    document.getElementById("countdown").innerHTML = "UPDATE IS LIVE!";
+    return;
+  }
+
+  // Time calculations
+  const years = Math.floor(distance / (1000 * 60 * 60 * 24 * 365));
+  const days = Math.floor((distance % (1000 * 60 * 60 * 24 * 365)) / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+  document.getElementById("countdown").innerHTML =
+    years + "y " + days + "d " + hours + "h " + minutes + "m " + seconds + "s ";
+}, 1000);
+</script>
+
+<!-- Footer -->
+<footer>
+  <p>&copy; 2025 Hadel Water. All rights reserved.</p>
+</footer>
+
+</body>
+</html>
