@@ -3,148 +3,299 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Hadel Water - Mega Version</title>
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;700&display=swap" rel="stylesheet">
+<title>Hadel Water</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
+
 <style>
-* { margin:0; padding:0; box-sizing:border-box; }
-body { font-family: 'Poppins', sans-serif; background: linear-gradient(to right,#c9d6ff,#e2e2e2); color:#222; line-height:1.6; }
 
-/* Navbar */
-nav{background:#111;color:#fff;padding:15px 40px;display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;z-index:10;}
-nav .logo{font-weight:700;font-size:24px;text-transform:uppercase;}
-nav ul{list-style:none;display:flex;gap:25px;}
-nav ul li a{text-decoration:none;color:#fff;transition:color 0.3s;}
-nav ul li a:hover{color:#00aaff;}
+/* ================= GLOBAL ================= */
 
-/* Hero */
-.hero{background:url('Water.png') center/cover no-repeat;color:#fff;text-align:center;padding:140px 20px;position:relative;overflow:hidden;}
-.hero::after{content:"";position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:0;}
-.hero-content{position:relative;z-index:1;}
-.hero h1{font-size:70px;margin-bottom:20px;text-transform:uppercase;letter-spacing:3px;text-shadow:2px 2px 8px rgba(0,0,0,0.7);}
-.hero p{font-size:22px;max-width:700px;margin:0 auto 30px;text-shadow:1px 1px 5px rgba(0,0,0,0.6);}
-.button{padding:14px 30px;background:#0077ff;color:white;text-decoration:none;border-radius:8px;transition: all 0.3s;display:inline-block;}
-.button:hover{background:#0056cc;transform:scale(1.05);box-shadow:0 5px 15px rgba(0,0,0,0.3);}
-
-/* Sections */
-section{padding:70px 20px;max-width:1100px;margin:auto;}
-h2{text-align:center;font-size:36px;margin-bottom:20px;}
-.img-gallery{display:flex;gap:20px;justify-content:center;flex-wrap:wrap;margin-top:30px;}
-.img-gallery img{border-radius:15px;box-shadow:0 4px 10px rgba(0,0,0,0.2);max-width:100%;transition:transform 0.3s,box-shadow 0.3s;}
-.img-gallery img:hover{transform:scale(1.05);box-shadow:0 10px 20px rgba(0,0,0,0.3);}
-
-/* Fish Encyclopedia */
-.fish-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:25px;margin-top:30px;}
-.fish-card{background:white;border-radius:15px;padding:20px;box-shadow:0 4px 15px rgba(0,0,0,0.2);text-align:center;transition:transform 0.3s,box-shadow 0.3s;}
-.fish-card:hover{transform:translateY(-10px);box-shadow:0 10px 25px rgba(0,0,0,0.3);}
-.fish-card img{width:100%;border-radius:12px;margin-bottom:15px;}
-.fish-card h3{font-size:22px;margin-bottom:10px;}
-.fish-card p{font-size:16px;color:#555;}
-
-/* Footer */
-footer{text-align:center;padding:25px;background:#111;color:#fff;margin-top:40px;}
-
-/* Responsive */
-@media(max-width:768px){
-  nav ul{flex-direction:column;gap:15px;}
-  .hero h1{font-size:45px;}
-  .hero p{font-size:18px;}
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  scroll-behavior: smooth;
 }
 
-/* Floating Fish Animation */
-.fish-animate{position:absolute;width:60px;height:60px;animation:swim 10s linear infinite;}
-@keyframes swim{0%{transform:translateX(-100px);}100%{transform:translateX(110vw);}}
+body {
+  font-family: 'Poppins', sans-serif;
+  background: #0b0f18;
+  color: #fff;
+  overflow-x: hidden;
+}
+
+/* ================= NAVBAR ================= */
+
+nav {
+  position: fixed;
+  width: 100%;
+  padding: 20px 60px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(10px);
+  z-index: 1000;
+  transition: 0.3s;
+}
+
+nav.scrolled {
+  background: rgba(0,0,0,0.9);
+}
+
+.logo {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 2px;
+}
+
+nav ul {
+  list-style: none;
+  display: flex;
+  gap: 40px;
+}
+
+nav ul li a {
+  text-decoration: none;
+  color: #aaa;
+  font-weight: 500;
+  transition: 0.3s;
+}
+
+nav ul li a:hover {
+  color: #00aaff;
+}
+
+/* ================= HERO ================= */
+
+.hero {
+  height: 100vh;
+  background: linear-gradient(to bottom, rgba(0,0,0,0.7), rgba(0,0,0,0.9)), url('Water.png') center/cover no-repeat;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.hero h1 {
+  font-size: 80px;
+  font-weight: 800;
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  animation: fadeUp 1.2s ease forwards;
+}
+
+.hero p {
+  font-size: 22px;
+  margin-top: 20px;
+  color: #ccc;
+  animation: fadeUp 1.5s ease forwards;
+}
+
+.hero button {
+  margin-top: 40px;
+  padding: 16px 40px;
+  border: none;
+  font-size: 18px;
+  border-radius: 50px;
+  background: linear-gradient(45deg,#0077ff,#00aaff);
+  color: white;
+  cursor: pointer;
+  box-shadow: 0 0 20px #0077ff;
+  transition: 0.4s;
+}
+
+.hero button:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 40px #00aaff;
+}
+
+/* ================= SECTIONS ================= */
+
+section {
+  padding: 120px 80px;
+  max-width: 1300px;
+  margin: auto;
+}
+
+section h2 {
+  font-size: 48px;
+  margin-bottom: 40px;
+  text-align: center;
+}
+
+/* ================= FEATURES ================= */
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px,1fr));
+  gap: 40px;
+}
+
+.feature-card {
+  background: #111827;
+  padding: 40px;
+  border-radius: 20px;
+  transition: 0.4s;
+  box-shadow: 0 0 20px rgba(0,0,0,0.5);
+}
+
+.feature-card:hover {
+  transform: translateY(-15px);
+  box-shadow: 0 0 40px rgba(0,170,255,0.4);
+}
+
+.feature-card h3 {
+  margin-bottom: 15px;
+}
+
+/* ================= GALLERY ================= */
+
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px,1fr));
+  gap: 30px;
+}
+
+.gallery img {
+  width: 100%;
+  border-radius: 20px;
+  transition: 0.5s;
+  cursor: pointer;
+}
+
+.gallery img:hover {
+  transform: scale(1.05);
+  filter: brightness(1.2);
+}
+
+/* ================= COUNTDOWN ================= */
+
+#countdown {
+  font-size: 36px;
+  text-align: center;
+  margin-top: 30px;
+  color: #00aaff;
+}
+
+/* ================= FOOTER ================= */
+
+footer {
+  text-align: center;
+  padding: 40px;
+  background: #000;
+  color: #666;
+}
+
+/* ================= ANIMATIONS ================= */
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ================= RESPONSIVE ================= */
+
+@media(max-width: 768px){
+  .hero h1 { font-size: 50px; }
+  nav { padding: 20px; }
+  section { padding: 80px 20px; }
+}
+
 </style>
 </head>
+
 <body>
 
-<!-- Navbar -->
-<nav>
+<nav id="navbar">
   <div class="logo">Hadel Water</div>
   <ul>
-    <li><a href="#about">About</a></li>
+    <li><a href="#features">Features</a></li>
     <li><a href="#gallery">Gallery</a></li>
-    <li><a href="#fish">Fish</a></li>
-    <li><a href="#updates">Updates</a></li>
+    <li><a href="#release">Release</a></li>
   </ul>
 </nav>
 
-<!-- Hero -->
 <header class="hero">
-  <div class="hero-content">
+  <div>
     <h1>Hadel Water</h1>
-    <p>Explore vast seas and face epic aquatic challenges!</p>
-    <a href="#updates" class="button">See Updates</a>
+    <p>An open-world fishing adventure across uncharted seas.</p>
+    <button onclick="scrollToSection()">Explore the Depths</button>
   </div>
-  <canvas id="particles" style="position:absolute;top:0;left:0;width:100%;height:100%;z-index:0;"></canvas>
-  <img src="image2.png" class="fish-animate" style="top:150px;animation-duration:12s;">
-  <img src="image3.png" class="fish-animate" style="top:300px;animation-duration:18s;">
 </header>
 
-<!-- About -->
-<section id="about">
-  <h2>About the Game</h2>
-  <p>Hadel Water is an open-world fishing adventure with rare catches, massive sea monsters, and treasures to discover.</p>
-  <p>Upgrade your boat, explore mysterious islands, and survive the ocean's hidden dangers!</p>
+<section id="features">
+  <h2>Game Features</h2>
+  <div class="features">
+    <div class="feature-card">
+      <h3>🌊 Massive Open World</h3>
+      <p>Explore vast oceans filled with life, secrets, and danger.</p>
+    </div>
+    <div class="feature-card">
+      <h3>🐟 100+ Fish Species</h3>
+      <p>From common schools to rare abyssal creatures.</p>
+    </div>
+    <div class="feature-card">
+      <h3>⚔ Deep Sea Monsters</h3>
+      <p>Battle creatures that rise from the abyss.</p>
+    </div>
+  </div>
 </section>
 
-<!-- Gallery (Repeat multiple times to expand lines) -->
 <section id="gallery">
   <h2>Gallery</h2>
-  <div class="img-gallery">
-    <img src="Water.png" alt="Ocean Scene">
+  <div class="gallery">
+    <img src="Water.png" alt="Ocean View">
     <img src="image.png" alt="Fishing Scene">
-    <img src="image2.png" alt="Boat on Sea">
-    <img src="image3.png" alt="Sunset Over Water">
+    <img src="image2.png" alt="Boat Exploration">
+    <img src="image3.png" alt="Sunset Ocean">
   </div>
 </section>
 
-<!-- Fish Encyclopedia (Repeated 50+ times to expand lines) -->
-<section id="fish">
-  <h2>Fish Encyclopedia</h2>
-  <div class="fish-grid">
-    <div class="fish-card"><img src="fish1.png" alt="Bluefin Tuna"><h3>Bluefin Tuna</h3><p>Fast and powerful, often found in open waters.</p></div>
-    <div class="fish-card"><img src="fish2.png" alt="Clownfish"><h3>Clownfish</h3><p>Lives in coral reefs and forms symbiotic relationships with anemones.</p></div>
-    <div class="fish-card"><img src="fish3.png" alt="Giant Squid"><h3>Giant Squid</h3><p>A rare deep-sea creature that can challenge even the strongest boats.</p></div>
-    <!-- Repeat these divs 50+ times to increase line count -->
-  </div>
-</section>
-
-<!-- Updates Section with Countdown -->
-<section id="updates" style="text-align:center;">
-  <h2>Game Release Countdown</h2>
-  <p>Exciting features and new content coming soon!</p>
-  <a href="#" class="button">View Updates</a>
+<section id="release">
+  <h2>Release Countdown</h2>
   <div id="countdown"></div>
 </section>
 
 <footer>
-  <p>&copy; 2025 Hadel Water. All rights reserved.</p>
+  © 2025 Hadel Water Studio
 </footer>
 
 <script>
+
+// Navbar scroll effect
+window.addEventListener("scroll", function(){
+  document.getElementById("navbar").classList.toggle("scrolled", window.scrollY > 50);
+});
+
+// Smooth scroll button
+function scrollToSection(){
+  document.getElementById("features").scrollIntoView({behavior: "smooth"});
+}
+
 // Countdown
 const countDownDate = new Date("Aug 18, 2028 00:00:00").getTime();
-setInterval(() => {
+
+setInterval(function() {
   const now = new Date().getTime();
   const distance = countDownDate - now;
-  if(distance<0){document.getElementById("countdown").innerHTML="UPDATE IS LIVE!"; return;}
-  const days = Math.floor(distance / (1000*60*60*24));
-  const hours = Math.floor((distance % (1000*60*60*24)) / (1000*60*60));
-  const minutes = Math.floor((distance % (1000*60*60)) / (1000*60));
-  const seconds = Math.floor((distance % (1000*60)) / 1000);
-  document.getElementById("countdown").innerHTML = `${days}d ${hours}h ${minutes}m ${seconds}s`;
-},1000);
 
-// Particle effect
-const canvas = document.getElementById('particles');
-const ctx = canvas.getContext('2d');
-canvas.width = window.innerWidth;
-canvas.height = document.querySelector('.hero').offsetHeight;
-const particlesArray = [];
-class Particle{constructor(){this.x=Math.random()*canvas.width;this.y=Math.random()*canvas.height;this.size=Math.random()*2+1;this.speedY=Math.random()*1-0.5;this.speedX=Math.random()*1-0.5;}update(){this.x+=this.speedX;this.y+=this.speedY;if(this.x>canvas.width)this.x=0;if(this.x<0)this.x=canvas.width;if(this.y>canvas.height)this.y=0;if(this.y<0)this.y=canvas.height;}draw(){ctx.fillStyle='rgba(255,255,255,0.7)';ctx.beginPath();ctx.arc(this.x,this.y,this.size,0,Math.PI*2);ctx.fill();}}
-for(let i=0;i<200;i++){particlesArray.push(new Particle());}
-function animateParticles(){ctx.clearRect(0,0,canvas.width,canvas.height);particlesArray.forEach(p=>{p.update();p.draw();});requestAnimationFrame(animateParticles);}
-animateParticles();
+  const days = Math.floor(distance / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
+  const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+  document.getElementById("countdown").innerHTML =
+    days + "d " + hours + "h " + minutes + "m " + seconds + "s ";
+}, 1000);
+
 </script>
 
 </body>
