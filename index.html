@@ -1,177 +1,144 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <link rel="stylesheet" href="https://pyscript.net/latest/pyscript.css" />
-    <script defer src="https://pyscript.net/latest/pyscript.js"></script>
-    <py-config>
-        packages = ["ursina"]
-    </py-config>
+    <meta charset="UTF-8">
+    <title>OHM-BLOX: NCEA ESCAPE v2.0</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; }
+        #ui { position: absolute; top: 20px; left: 20px; color: #00ff00; text-shadow: 2px 2px #000; pointer-events: none; }
+        #crosshair { position: absolute; top: 50%; left: 50%; width: 10px; height: 10px; border: 2px solid white; border-radius: 50%; transform: translate(-50%, -50%); }
+        #instructions { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); color: white; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px; }
+    </style>
 </head>
 <body>
-    <h1>Ohm-blox is Loading...</h1>
-    <py-script>
-        # PASTE ALL THE PYTHON CODE I GAVE YOU HERE
-    </py-script>
+    <div id="ui">
+        <h1>PROJECT: OHM-BLOX v2.0</h1>
+        <div id="stats">VOLTAGE: 230V | CURRENT: 2A | RESISTANCE: ???</div>
+        <div id="goal-dist">DISTANCE TO PS5: --</div>
+    </div>
+    <div id="crosshair"></div>
+    <div id="instructions">WASD to Move | SPACE to Jump | CLICK to Lock Mouse</div>
+
+    <script type="importmap">
+        { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+
+        // --- GAME CONFIGURATION ---
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false, canJump = false;
+        let velocity = new THREE.Vector3();
+        let direction = new THREE.Vector3();
+        let prevTime = performance.now();
+
+        // --- SCENE SETUP ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x000011);
+        scene.fog = new THREE.FogExp2(0x000011, 0.02);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // --- LIGHTING ---
+        const ambientLight = new THREE.AmbientLight(0x404040, 2);
+        scene.add(ambientLight);
+        const sun = new THREE.DirectionalLight(0xffffff, 1);
+        sun.position.set(10, 20, 10);
+        scene.add(sun);
+
+        // --- WORLD GENERATION ---
+        const floorGeo = new THREE.PlaneGeometry(1000, 1000);
+        const floorMat = new THREE.MeshPhongMaterial({ color: 0x111111 });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        scene.add(floor);
+
+        const boxes = [];
+        for (let i = 0; i < 50; i++) {
+            const boxGeo = new THREE.BoxGeometry(4, 1, 4);
+            const boxMat = new THREE.MeshPhongMaterial({ color: Math.random() * 0xffffff });
+            const box = new THREE.Mesh(boxGeo, boxMat);
+            box.position.set(Math.random() * 40 - 20, i * 2, -i * 10);
+            scene.add(box);
+            boxes.push(box);
+        }
+
+        // --- THE PS5 GOAL ---
+        const goalGeo = new THREE.BoxGeometry(6, 10, 2);
+        const goalMat = new THREE.MeshPhongMaterial({ color: 0x0000ff, emissive: 0x0000ff });
+        const ps5 = new THREE.Mesh(goalGeo, goalMat);
+        ps5.position.set(0, 105, -520);
+        scene.add(ps5);
+
+        // --- CONTROLS ---
+        document.addEventListener('mousedown', () => document.body.requestPointerLock());
+        document.addEventListener('keydown', (e) => {
+            if(e.code === 'KeyW') moveForward = true;
+            if(e.code === 'KeyS') moveBackward = true;
+            if(e.code === 'KeyA') moveLeft = true;
+            if(e.code === 'KeyD') moveRight = true;
+            if(e.code === 'Space' && canJump) { velocity.y += 15; canJump = false; }
+        });
+        document.addEventListener('keyup', (e) => {
+            if(e.code === 'KeyW') moveForward = false;
+            if(e.code === 'KeyS') moveBackward = false;
+            if(e.code === 'KeyA') moveLeft = false;
+            if(e.code === 'KeyD') moveRight = false;
+        });
+        document.addEventListener('mousemove', (e) => {
+            if (document.pointerLockElement) {
+                camera.rotation.y -= e.movementX * 0.002;
+                camera.rotation.x -= e.movementY * 0.002;
+                camera.rotation.x = Math.max(-Math.PI/2, Math.min(Math.PI/2, camera.rotation.x));
+            }
+        });
+
+        camera.position.y = 2;
+        camera.rotation.order = 'YXZ';
+
+        // --- GAME LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+            const time = performance.now();
+            const delta = (time - prevTime) / 1000;
+
+            velocity.x -= velocity.x * 10.0 * delta;
+            velocity.z -= velocity.z * 10.0 * delta;
+            velocity.y -= 9.8 * 4.0 * delta; // Gravity
+
+            direction.z = Number(moveForward) - Number(moveBackward);
+            direction.x = Number(moveRight) - Number(moveLeft);
+            direction.normalize();
+
+            if (moveForward || moveBackward) velocity.z -= direction.z * 400.0 * delta;
+            if (moveLeft || moveRight) velocity.x -= direction.x * 400.0 * delta;
+
+            camera.translateX(-velocity.x * delta);
+            camera.translateZ(velocity.z * delta);
+            camera.position.y += velocity.y * delta;
+
+            if (camera.position.y < 1) {
+                velocity.y = 0;
+                camera.position.y = 1;
+                canJump = true;
+            }
+
+            // Dist to Goal
+            const dist = camera.position.distanceTo(ps5.position);
+            document.getElementById('goal-dist').innerText = `DISTANCE TO PS5: ${Math.floor(dist)}m`;
+            
+            if(dist < 10) {
+                document.getElementById('stats').innerText = "RESISTANCE ACHIEVED: 115 OHMS!";
+                document.getElementById('stats').style.color = "gold";
+            }
+
+            prevTime = time;
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
 </body>
 </html>
-OHM-BLOX ENGINE v1.0.4 - NCEA SPECIAL EDITION
-Core Systems: Physics, Procedural Generation, Game State Management
-"""
-
-from ursina import *
-from ursina.prefabs.first_person_controller import FirstPersonController
-import random
-
-# ==========================================
-# 1. GLOBAL CONFIGURATION & CONSTANTS
-# ==========================================
-VERSION = "1.0.4"
-GRAVITY = 0.8
-WALK_SPEED = 12
-JUMP_HEIGHT = 2
-WORLD_SIZE = 200
-TOTAL_STAGES = 25
-DEBUG_MODE = False
-
-# ==========================================
-# 2. CORE GAME ENGINE CLASS
-# ==========================================
-class OhmGame(Ursina):
-    def __init__(self):
-        super().__init__()
-        window.title = f"Ohm-blox Engine {VERSION}"
-        window.borderless = False
-        window.fullscreen = False
-        window.exit_button.visible = False
-        window.fps_counter.enabled = True
-        
-        self.state = 'MENU'
-        self.score = 0
-        self.high_voltage_detected = False
-
-# ==========================================
-# 3. ENVIRONMENT & LIGHTING
-# ==========================================
-class Environment:
-    def __init__(self):
-        self.sun = DirectionalLight()
-        self.sun.look_at(Vec3(1, -1, 1))
-        self.sky = Sky(texture='sky_sunset')
-        self.floor = Entity(
-            model='plane', 
-            collider='box', 
-            scale=WORLD_SIZE, 
-            texture='grass', 
-            texture_scale=(20,20), 
-            color=color.dark_gray
-        )
-        
-    def update_sun(self):
-        self.sun.rotation_x += time.dt * 1.5
-
-# ==========================================
-# 4. INTERACTABLE OBJECTS (POWER BLOCKS)
-# ==========================================
-class PowerBlock(Entity):
-    def __init__(self, pos=(0,0,0), v=230):
-        super().__init__(
-            model='cube',
-            position=pos,
-            scale=(2.5, 1, 2.5),
-            collider='box',
-            texture='white_cube',
-            color=color.random_color()
-        )
-        self.voltage = v
-        self.base_y = pos[1]
-        self.pulse_speed = random.uniform(1, 3)
-
-    def update(self):
-        # Hover effect using sine wave math
-        self.y = self.base_y + math.sin(time.time() * self.pulse_speed) * 0.5
-
-# ==========================================
-# 5. USER INTERFACE (HUD)
-# ==========================================
-class HUD:
-    def __init__(self):
-        self.title = Text(
-            text='PROJECT: OHM-BLOX', 
-            position=(-0.85, 0.45), 
-            scale=2, 
-            color=color.yellow
-        )
-        self.stats = Text(
-            text='V: 112 | I: 2A | R: CALCULATING...', 
-            position=(-0.85, 0.38), 
-            color=color.cyan
-        )
-        self.crosshair = Entity(
-            model='quad', 
-            parent=camera.ui, 
-            scale=0.01, 
-            color=color.white
-        )
-
-    def update_stats(self, r_val):
-        self.stats.text = f'V: 112 | I: 2A | R: {r_val} Ohms'
-
-# ==========================================
-# 6. MAIN GAME LOOP & LOGIC
-# ==========================================
-app = OhmGame()
-env = Environment()
-ui = HUD()
-
-# Generate Procedural Course
-course_blocks = []
-for i in range(TOTAL_STAGES):
-    x = random.randint(-15, 15)
-    y = i * 1.5
-    z = i * 8
-    block = PowerBlock(pos=(x, y, z))
-    course_blocks.append(block)
-
-# The Goal (PlayStation Logic)
-ps5_goal = Entity(
-    model='cube', 
-    color=color.blue, 
-    scale=(5, 3, 5),
-    position=(0, TOTAL_STAGES * 1.5, TOTAL_STAGES * 8 + 10),
-    collider='box',
-    texture='brick'
-)
-ps5_label = Text(parent=ps5_goal, text='FINISH LINE', y=2, billboard=True, scale=12)
-
-# Initialize Player
-player = FirstPersonController(
-    model='cube', 
-    z=-10, 
-    color=color.orange, 
-    speed=WALK_SPEED,
-    jump_height=JUMP_HEIGHT
-)
-
-def update():
-    env.update_sun()
-    
-    # Fall detection (Short Circuit)
-    if player.y < -30:
-        player.position = (0, 10, -10)
-        ui.title.text = "SHORT CIRCUIT! TRY AGAIN"
-        ui.title.color = color.red
-        invoke(setattr, ui.title, 'text', 'PROJECT: OHM-BLOX', delay=2)
-        invoke(setattr, ui.title, 'color', color.yellow, delay=2)
-
-    # Win detection
-    if distance(player.position, ps5_goal.position) < 6:
-        ui.update_stats(56)
-        ui.title.text = "LEVEL COMPLETE - ACHEIVED!"
-        ui.title.color = color.green
-        player.disable()
-
-# ==========================================
-# 7. EXECUTION
-# ==========================================
-if __name__ == '__main__':
-    app.run()
