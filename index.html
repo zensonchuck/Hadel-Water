@@ -5,298 +5,165 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Hadel Water</title>
 
-<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap" rel="stylesheet">
+"""
+OHM-BLOX ENGINE v1.0.4 - NCEA SPECIAL EDITION
+Core Systems: Physics, Procedural Generation, Game State Management
+"""
 
-<style>
+from ursina import *
+from ursina.prefabs.first_person_controller import FirstPersonController
+import random
 
-/* ================= GLOBAL ================= */
+# ==========================================
+# 1. GLOBAL CONFIGURATION & CONSTANTS
+# ==========================================
+VERSION = "1.0.4"
+GRAVITY = 0.8
+WALK_SPEED = 12
+JUMP_HEIGHT = 2
+WORLD_SIZE = 200
+TOTAL_STAGES = 25
+DEBUG_MODE = False
 
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  scroll-behavior: smooth;
-}
+# ==========================================
+# 2. CORE GAME ENGINE CLASS
+# ==========================================
+class OhmGame(Ursina):
+    def __init__(self):
+        super().__init__()
+        window.title = f"Ohm-blox Engine {VERSION}"
+        window.borderless = False
+        window.fullscreen = False
+        window.exit_button.visible = False
+        window.fps_counter.enabled = True
+        
+        self.state = 'MENU'
+        self.score = 0
+        self.high_voltage_detected = False
 
-body {
-  font-family: 'Poppins', sans-serif;
-  background: #0b0f18;
-  color: #fff;
-  overflow-x: hidden;
-}
+# ==========================================
+# 3. ENVIRONMENT & LIGHTING
+# ==========================================
+class Environment:
+    def __init__(self):
+        self.sun = DirectionalLight()
+        self.sun.look_at(Vec3(1, -1, 1))
+        self.sky = Sky(texture='sky_sunset')
+        self.floor = Entity(
+            model='plane', 
+            collider='box', 
+            scale=WORLD_SIZE, 
+            texture='grass', 
+            texture_scale=(20,20), 
+            color=color.dark_gray
+        )
+        
+    def update_sun(self):
+        self.sun.rotation_x += time.dt * 1.5
 
-/* ================= NAVBAR ================= */
+# ==========================================
+# 4. INTERACTABLE OBJECTS (POWER BLOCKS)
+# ==========================================
+class PowerBlock(Entity):
+    def __init__(self, pos=(0,0,0), v=230):
+        super().__init__(
+            model='cube',
+            position=pos,
+            scale=(2.5, 1, 2.5),
+            collider='box',
+            texture='white_cube',
+            color=color.random_color()
+        )
+        self.voltage = v
+        self.base_y = pos[1]
+        self.pulse_speed = random.uniform(1, 3)
 
-nav {
-  position: fixed;
-  width: 100%;
-  padding: 20px 60px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: rgba(0,0,0,0.6);
-  backdrop-filter: blur(10px);
-  z-index: 1000;
-  transition: 0.3s;
-}
+    def update(self):
+        # Hover effect using sine wave math
+        self.y = self.base_y + math.sin(time.time() * self.pulse_speed) * 0.5
 
-nav.scrolled {
-  background: rgba(0,0,0,0.9);
-}
+# ==========================================
+# 5. USER INTERFACE (HUD)
+# ==========================================
+class HUD:
+    def __init__(self):
+        self.title = Text(
+            text='PROJECT: OHM-BLOX', 
+            position=(-0.85, 0.45), 
+            scale=2, 
+            color=color.yellow
+        )
+        self.stats = Text(
+            text='V: 112 | I: 2A | R: CALCULATING...', 
+            position=(-0.85, 0.38), 
+            color=color.cyan
+        )
+        self.crosshair = Entity(
+            model='quad', 
+            parent=camera.ui, 
+            scale=0.01, 
+            color=color.white
+        )
 
-.logo {
-  font-size: 24px;
-  font-weight: 800;
-  letter-spacing: 2px;
-}
+    def update_stats(self, r_val):
+        self.stats.text = f'V: 112 | I: 2A | R: {r_val} Ohms'
 
-nav ul {
-  list-style: none;
-  display: flex;
-  gap: 40px;
-}
+# ==========================================
+# 6. MAIN GAME LOOP & LOGIC
+# ==========================================
+app = OhmGame()
+env = Environment()
+ui = HUD()
 
-nav ul li a {
-  text-decoration: none;
-  color: #aaa;
-  font-weight: 500;
-  transition: 0.3s;
-}
+# Generate Procedural Course
+course_blocks = []
+for i in range(TOTAL_STAGES):
+    x = random.randint(-15, 15)
+    y = i * 1.5
+    z = i * 8
+    block = PowerBlock(pos=(x, y, z))
+    course_blocks.append(block)
 
-nav ul li a:hover {
-  color: #00aaff;
-}
+# The Goal (PlayStation Logic)
+ps5_goal = Entity(
+    model='cube', 
+    color=color.blue, 
+    scale=(5, 3, 5),
+    position=(0, TOTAL_STAGES * 1.5, TOTAL_STAGES * 8 + 10),
+    collider='box',
+    texture='brick'
+)
+ps5_label = Text(parent=ps5_goal, text='FINISH LINE', y=2, billboard=True, scale=12)
 
-/* ================= HERO ================= */
+# Initialize Player
+player = FirstPersonController(
+    model='cube', 
+    z=-10, 
+    color=color.orange, 
+    speed=WALK_SPEED,
+    jump_height=JUMP_HEIGHT
+)
 
-.hero {
-  height: 100vh;
-  background: linear-gradient(to bottom, rgba(0,0,0,0.7), rgba(0,0,0,0.9)), url('Water.png') center/cover no-repeat;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-}
+def update():
+    env.update_sun()
+    
+    # Fall detection (Short Circuit)
+    if player.y < -30:
+        player.position = (0, 10, -10)
+        ui.title.text = "SHORT CIRCUIT! TRY AGAIN"
+        ui.title.color = color.red
+        invoke(setattr, ui.title, 'text', 'PROJECT: OHM-BLOX', delay=2)
+        invoke(setattr, ui.title, 'color', color.yellow, delay=2)
 
-.hero h1 {
-  font-size: 80px;
-  font-weight: 800;
-  letter-spacing: 6px;
-  text-transform: uppercase;
-  animation: fadeUp 1.2s ease forwards;
-}
+    # Win detection
+    if distance(player.position, ps5_goal.position) < 6:
+        ui.update_stats(56)
+        ui.title.text = "LEVEL COMPLETE - ACHEIVED!"
+        ui.title.color = color.green
+        player.disable()
 
-.hero p {
-  font-size: 22px;
-  margin-top: 20px;
-  color: #ccc;
-  animation: fadeUp 1.5s ease forwards;
-}
-
-.hero button {
-  margin-top: 40px;
-  padding: 16px 40px;
-  border: none;
-  font-size: 18px;
-  border-radius: 50px;
-  background: linear-gradient(45deg,#0077ff,#00aaff);
-  color: white;
-  cursor: pointer;
-  box-shadow: 0 0 20px #0077ff;
-  transition: 0.4s;
-}
-
-.hero button:hover {
-  transform: scale(1.1);
-  box-shadow: 0 0 40px #00aaff;
-}
-
-/* ================= SECTIONS ================= */
-
-section {
-  padding: 120px 80px;
-  max-width: 1300px;
-  margin: auto;
-}
-
-section h2 {
-  font-size: 48px;
-  margin-bottom: 40px;
-  text-align: center;
-}
-
-/* ================= FEATURES ================= */
-
-.features {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px,1fr));
-  gap: 40px;
-}
-
-.feature-card {
-  background: #111827;
-  padding: 40px;
-  border-radius: 20px;
-  transition: 0.4s;
-  box-shadow: 0 0 20px rgba(0,0,0,0.5);
-}
-
-.feature-card:hover {
-  transform: translateY(-15px);
-  box-shadow: 0 0 40px rgba(0,170,255,0.4);
-}
-
-.feature-card h3 {
-  margin-bottom: 15px;
-}
-
-/* ================= GALLERY ================= */
-
-.gallery {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(350px,1fr));
-  gap: 30px;
-}
-
-.gallery img {
-  width: 100%;
-  border-radius: 20px;
-  transition: 0.5s;
-  cursor: pointer;
-}
-
-.gallery img:hover {
-  transform: scale(1.05);
-  filter: brightness(1.2);
-}
-
-/* ================= COUNTDOWN ================= */
-
-#countdown {
-  font-size: 36px;
-  text-align: center;
-  margin-top: 30px;
-  color: #00aaff;
-}
-
-/* ================= FOOTER ================= */
-
-footer {
-  text-align: center;
-  padding: 40px;
-  background: #000;
-  color: #666;
-}
-
-/* ================= ANIMATIONS ================= */
-
-@keyframes fadeUp {
-  from {
-    opacity: 0;
-    transform: translateY(40px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* ================= RESPONSIVE ================= */
-
-@media(max-width: 768px){
-  .hero h1 { font-size: 50px; }
-  nav { padding: 20px; }
-  section { padding: 80px 20px; }
-}
-
-</style>
-</head>
-
-<body>
-
-<nav id="navbar">
-  <div class="logo">Hadel Water</div>
-  <ul>
-    <li><a href="#features">Features</a></li>
-    <li><a href="#gallery">Gallery</a></li>
-    <li><a href="#release">Release</a></li>
-  </ul>
-</nav>
-
-<header class="hero">
-  <div>
-    <h1>Hadel Water</h1>
-    <p>An open-world fishing adventure across uncharted seas.</p>
-    <button onclick="scrollToSection()">Explore the Depths</button>
-  </div>
-</header>
-
-<section id="features">
-  <h2>Game Features</h2>
-  <div class="features">
-    <div class="feature-card">
-      <h3>🌊 Massive Open World</h3>
-      <p>Explore vast oceans filled with life, secrets, and danger.</p>
-    </div>
-    <div class="feature-card">
-      <h3>🐟 100+ Fish Species</h3>
-      <p>From common schools to rare abyssal creatures.</p>
-    </div>
-    <div class="feature-card">
-      <h3>⚔ Deep Sea Monsters</h3>
-      <p>Battle creatures that rise from the abyss.</p>
-    </div>
-  </div>
-</section>
-
-<section id="gallery">
-  <h2>Gallery</h2>
-  <div class="gallery">
-    <img src="Water.png" alt="Ocean View">
-    <img src="image.png" alt="Fishing Scene">
-    <img src="image2.png" alt="Boat Exploration">
-    <img src="image3.png" alt="Sunset Ocean">
-  </div>
-</section>
-
-<section id="release">
-  <h2>Release Countdown</h2>
-  <div id="countdown"></div>
-</section>
-
-<footer>
-  © 2025 Hadel Water Studio
-</footer>
-
-<script>
-
-// Navbar scroll effect
-window.addEventListener("scroll", function(){
-  document.getElementById("navbar").classList.toggle("scrolled", window.scrollY > 50);
-});
-
-// Smooth scroll button
-function scrollToSection(){
-  document.getElementById("features").scrollIntoView({behavior: "smooth"});
-}
-
-// Countdown
-const countDownDate = new Date("Aug 18, 2028 00:00:00").getTime();
-
-setInterval(function() {
-  const now = new Date().getTime();
-  const distance = countDownDate - now;
-
-  const days = Math.floor(distance / (1000 * 60 * 60 * 24));
-  const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-  const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-  const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-
-  document.getElementById("countdown").innerHTML =
-    days + "d " + hours + "h " + minutes + "m " + seconds + "s ";
-}, 1000);
-
-</script>
-
-</body>
-</html>
+# ==========================================
+# 7. EXECUTION
+# ==========================================
+if __name__ == '__main__':
+    app.run()
