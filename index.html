@@ -2,19 +2,32 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>OHM-BLOX: NCEA ESCAPE v2.0</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OHM-BLOX ULTIMATE v3.0</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; font-family: sans-serif; }
-        #ui { position: absolute; top: 20px; left: 20px; color: #00ff00; pointer-events: none; font-family: monospace; }
-        #instructions { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); color: white; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 5px; }
+        body { margin: 0; overflow: hidden; background: #000; color: #0f0; font-family: 'Courier New', monospace; }
+        #overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;
+            background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+            background-size: 100% 2px, 3px 100%; z-index: 100; }
+        #ui-container { position: absolute; top: 20px; left: 20px; z-index: 10; padding: 15px; border: 2px solid #0f0; background: rgba(0,20,0,0.8); text-transform: uppercase; }
+        .stat-row { display: flex; justify-content: space-between; width: 300px; margin-bottom: 5px; }
+        #instructions { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: #0f0; color: #000; padding: 10px 20px; font-weight: bold; animation: blink 1s infinite; }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+        canvas { display: block; }
     </style>
 </head>
 <body>
-    <div id="ui">
-        <h1>PROJECT: OHM-BLOX v2.0</h1>
-        <div id="stats">VOLTAGE: 230V | CURRENT: 2A | RESISTANCE: ???</div>
+    <div id="overlay"></div>
+    <div id="ui-container">
+        <div style="font-size: 24px; font-weight: bold; margin-bottom: 10px;">SYSTEM: OHM-BLOX v3.0</div>
+        <div class="stat-row"><span>PROTOCOL:</span> <span id="protocol">NCEA_ENGAGE</span></div>
+        <div class="stat-row"><span>COORDINATES:</span> <span id="coords">X:0 Y:0 Z:0</span></div>
+        <div class="stat-row"><span>VOLTAGE:</span> <span id="v-val">230V</span></div>
+        <div class="stat-row"><span>CURRENT:</span> <span id="i-val">2.05A</span></div>
+        <div class="stat-row"><span>RESISTANCE:</span> <span id="r-val" style="color: #ff0;">CALCULATING...</span></div>
+        <div style="margin-top: 10px; height: 4px; background: #040;"><div id="progress" style="height: 100%; background: #0f0; width: 0%;"></div></div>
     </div>
-    <div id="instructions">CLICK TO START | WASD to Move | SPACE to Jump</div>
+    <div id="instructions">TERMINAL INITIALIZED: CLICK TO ENTER SYSTEM</div>
 
     <script type="importmap">
         { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
@@ -23,73 +36,220 @@
     <script type="module">
         import * as THREE from 'three';
 
+        /**
+         * ENGINE CONFIGURATION
+         */
+        const CONFIG = {
+            gravity: -0.012,
+            jumpForce: 0.28,
+            moveSpeed: 0.15,
+            friction: 0.9,
+            airRes: 0.98,
+            totalStages: 60
+        };
+
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x000011);
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        scene.background = new THREE.Color(0x000500);
+        scene.fog = new THREE.FogExp2(0x000500, 0.015);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.body.appendChild(renderer.domElement);
 
-        // Lighting
-        const light = new THREE.DirectionalLight(0xffffff, 1);
-        light.position.set(5, 10, 7.5);
-        scene.add(light);
-        scene.add(new THREE.AmbientLight(0x404040));
+        /**
+         * LIGHTING SYSTEM
+         */
+        const ambient = new THREE.AmbientLight(0x00ff00, 0.2);
+        scene.add(ambient);
 
-        // Create Floor
-        const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshPhongMaterial({ color: 0x222222 }));
-        floor.rotation.x = -Math.PI / 2;
-        scene.add(floor);
+        const playerLight = new THREE.PointLight(0x00ff00, 2, 20);
+        scene.add(playerLight);
 
-        // Create Obstacles (Voltage Blocks)
-        const blocks = [];
-        for (let i = 0; i < 20; i++) {
-            const block = new THREE.Mesh(new THREE.BoxGeometry(3, 1, 3), new THREE.MeshPhongMaterial({ color: Math.random() * 0xffffff }));
-            block.position.set(Math.random() * 20 - 10, i * 1.5, -i * 7);
-            scene.add(block);
-            blocks.push(block);
+        /**
+         * LEVEL GENERATOR SYSTEM
+         */
+        const platforms = [];
+        const platformGeo = new THREE.BoxGeometry(5, 1, 5);
+
+        function createPlatform(x, y, z, color = 0x00ff00) {
+            const mat = new THREE.MeshPhongMaterial({ 
+                color: color, 
+                emissive: color, 
+                emissiveIntensity: 0.5,
+                transparent: true,
+                opacity: 0.9
+            });
+            const mesh = new THREE.Mesh(platformGeo, mat);
+            mesh.position.set(x, y, z);
+            
+            // Add wireframe edge
+            const edges = new THREE.EdgesGeometry(platformGeo);
+            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0xffffff }));
+            mesh.add(line);
+            
+            scene.add(mesh);
+            platforms.push(mesh);
         }
 
-        // The Goal (PS5)
-        const ps5 = new THREE.Mesh(new THREE.BoxGeometry(4, 8, 2), new THREE.MeshPhongMaterial({ color: 0x0000ff }));
-        ps5.position.set(0, 30, -150);
-        scene.add(ps5);
+        // Procedural Path Logic
+        let lastX = 0, lastY = 0, lastZ = 0;
+        for (let i = 0; i < CONFIG.totalStages; i++) {
+            lastX += (Math.random() - 0.5) * 12;
+            lastY += (Math.random() * 2);
+            lastZ -= 12;
+            
+            let pColor = 0x00ff00;
+            if (i % 10 === 0) pColor = 0x00ffff; // Checkpoint colors
+            createPlatform(lastX, lastY, lastZ, pColor);
+        }
 
-        // Movement variables
-        let keys = {};
-        let velocityY = 0;
-        let isJumping = false;
+        // The Goal (Giant Capacitor / PS5)
+        const goalGeo = new THREE.BoxGeometry(10, 20, 10);
+        const goalMat = new THREE.MeshPhongMaterial({ color: 0x0000ff, emissive: 0x0000ff });
+        const goal = new THREE.Mesh(goalGeo, goalMat);
+        goal.position.set(lastX, lastY + 5, lastZ - 20);
+        scene.add(goal);
 
-        document.addEventListener('keydown', (e) => keys[e.code] = true);
-        document.addEventListener('keyup', (e) => keys[e.code] = false);
-        document.addEventListener('mousedown', () => document.body.requestPointerLock());
+        /**
+         * PARTICLE SYSTEM (Sparks)
+         */
+        const particleCount = 20;
+        const particles = new THREE.BufferGeometry();
+        const positions = new Float32Array(particleCount * 3);
+        for(let i=0; i<particleCount*3; i++) positions[i] = 0;
+        particles.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        const pMat = new THREE.PointsMaterial({ color: 0x00ff00, size: 0.1 });
+        const particleSystem = new THREE.Points(particles, pMat);
+        scene.add(particleSystem);
 
-        camera.position.set(0, 2, 5);
+        /**
+         * PLAYER PHYSICS ENGINE
+         */
+        let player = {
+            pos: new THREE.Vector3(0, 5, 0),
+            vel: new THREE.Vector3(),
+            rot: new THREE.Euler(0, 0, 0, 'YXZ'),
+            height: 1.8,
+            grounded: false
+        };
+
+        const keys = { w:false, a:false, s:false, d:false, space:false };
+        
+        document.addEventListener('keydown', (e) => {
+            const key = e.code.toLowerCase().replace('key', '');
+            if(keys.hasOwnProperty(key)) keys[key] = true;
+            if(e.code === 'Space') keys.space = true;
+        });
+        document.addEventListener('keyup', (e) => {
+            const key = e.code.toLowerCase().replace('key', '');
+            if(keys.hasOwnProperty(key)) keys[key] = false;
+            if(e.code === 'Space') keys.space = false;
+        });
+
+        document.addEventListener('mousedown', () => {
+            document.body.requestPointerLock();
+            document.getElementById('instructions').style.display = 'none';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (document.pointerLockElement) {
+                player.rot.y -= e.movementX * 0.002;
+                player.rot.x -= e.movementY * 0.002;
+                player.rot.x = Math.max(-Math.PI/2, Math.PI/2, player.rot.x);
+            }
+        });
+
+        /**
+         * GAME LOOP
+         */
+        function updatePhysics() {
+            // Horizontal Movement
+            const forward = new THREE.Vector3(0, 0, -1).applyEuler(new THREE.Euler(0, player.rot.y, 0));
+            const right = new THREE.Vector3(1, 0, 0).applyEuler(new THREE.Euler(0, player.rot.y, 0));
+
+            if(keys.w) player.vel.add(forward.multiplyScalar(CONFIG.moveSpeed));
+            if(keys.s) player.vel.add(forward.multiplyScalar(-CONFIG.moveSpeed));
+            if(keys.a) player.vel.add(right.multiplyScalar(-CONFIG.moveSpeed));
+            if(keys.d) player.vel.add(right.multiplyScalar(CONFIG.moveSpeed));
+
+            // Apply Friction
+            player.vel.x *= (player.grounded ? CONFIG.friction : CONFIG.airRes);
+            player.vel.z *= (player.grounded ? CONFIG.friction : CONFIG.airRes);
+
+            // Gravity
+            player.vel.y += CONFIG.gravity;
+
+            // Jump
+            if(keys.space && player.grounded) {
+                player.vel.y = CONFIG.jumpForce;
+                player.grounded = false;
+                // Trigger Sparks
+                for(let i=0; i<particleCount*3; i+=3) {
+                    positions[i] = player.pos.x; positions[i+1] = player.pos.y - 1; positions[i+2] = player.pos.z;
+                }
+            }
+
+            // Update Position
+            player.pos.add(player.vel);
+
+            // Collision Detection
+            player.grounded = false;
+            for(let p of platforms) {
+                const dx = Math.abs(player.pos.x - p.position.x);
+                const dz = Math.abs(player.pos.z - p.position.z);
+                if(dx < 3 && dz < 3) {
+                    const floorY = p.position.y + 1.5;
+                    if(player.pos.y <= floorY && player.pos.y >= floorY - 1) {
+                        player.pos.y = floorY;
+                        player.vel.y = 0;
+                        player.grounded = true;
+                    }
+                }
+            }
+
+            // Respawn
+            if(player.pos.y < -30) {
+                player.pos.set(0, 5, 0);
+                player.vel.set(0, 0, 0);
+            }
+
+            // UI Updates
+            document.getElementById('coords').innerText = `X:${player.pos.x.toFixed(1)} Y:${player.pos.y.toFixed(1)} Z:${player.pos.z.toFixed(1)}`;
+            const progress = Math.min(100, (player.pos.z / (lastZ-20)) * 100);
+            document.getElementById('progress').style.width = progress + "%";
+            
+            if(player.pos.distanceTo(goal.position) < 12) {
+                document.getElementById('r-val').innerText = "112.2 OHMS [ACHIEVED]";
+                document.getElementById('r-val').style.color = "#0f0";
+            }
+        }
 
         function animate() {
             requestAnimationFrame(animate);
-            
-            if (keys['KeyW']) camera.translateZ(-0.2);
-            if (keys['KeyS']) camera.translateZ(0.2);
-            if (keys['KeyA']) camera.translateX(-0.2);
-            if (keys['KeyD']) camera.translateX(0.2);
-            if (keys['Space'] && !isJumping) { velocityY = 0.3; isJumping = true; }
+            updatePhysics();
 
-            // Gravity
-            camera.position.y += velocityY;
-            if (camera.position.y > 1.6) {
-                velocityY -= 0.01;
-            } else {
-                camera.position.y = 1.6;
-                velocityY = 0;
-                isJumping = false;
+            camera.position.copy(player.pos);
+            camera.rotation.copy(player.rot);
+            playerLight.position.copy(player.pos);
+
+            // Animate Particles
+            const posAttr = particles.getAttribute('position');
+            for(let i=0; i<particleCount*3; i++) {
+                posAttr.array[i] += (Math.random() - 0.5) * 0.2;
             }
-
-            // Fall Reset
-            if (camera.position.y < -10) camera.position.set(0, 2, 5);
+            posAttr.needsUpdate = true;
 
             renderer.render(scene, camera);
         }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
         animate();
     </script>
 </body>
