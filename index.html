@@ -3,226 +3,123 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Vanguard: Crowd Surge Professional</title>
+    <title>VANGUARD: STABLE BUILD</title>
     <style>
-        :root { --primary: #00d2ff; --secondary: #3a7bd5; --enemy: #ff4b2b; }
-        body { margin: 0; padding: 0; overflow: hidden; background: #0a0a0a; font-family: 'Segoe UI', Roboto, sans-serif; user-select: none; }
-        #game-container { position: relative; width: 100vw; height: 100vh; display: flex; justify-content: center; align-items: center; }
-        canvas { display: block; box-shadow: 0 0 50px rgba(0,0,0,0.5); }
-        
-        /* UI OVERLAY */
-        #ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
-        .stat-card { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.6); padding: 10px 40px; border-radius: 50px; border: 2px solid var(--primary); color: white; text-align: center; backdrop-filter: blur(5px); }
-        #count-val { font-size: 42px; font-weight: 900; display: block; text-shadow: 0 0 10px var(--primary); }
-        #label { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; opacity: 0.8; }
-        
-        #msg-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; text-align: center; transition: opacity 0.3s; }
-        .btn { pointer-events: auto; background: linear-gradient(45deg, var(--primary), var(--secondary)); border: none; padding: 15px 40px; color: white; font-weight: bold; border-radius: 5px; cursor: pointer; font-size: 20px; margin-top: 20px; }
+        body { margin: 0; background: #050a10; overflow: hidden; font-family: 'Arial Black', sans-serif; }
+        canvas { display: block; }
+        #ui { position: absolute; top: 20px; width: 100%; text-align: center; pointer-events: none; }
+        #counter { font-size: 50px; color: #00d2ff; text-shadow: 0 0 15px #00d2ff; }
+        #msg { position: absolute; top: 50%; width: 100%; text-align: center; color: white; transform: translateY(-50%); }
+        .btn { pointer-events: auto; padding: 20px 50px; font-size: 24px; background: #00d2ff; border: none; border-radius: 10px; cursor: pointer; color: #000; font-weight: bold; }
     </style>
 </head>
 <body>
-
-<div id="game-container">
-    <div id="ui">
-        <div class="stat-card">
-            <span id="count-val">1</span>
-            <span id="label">Vanguard Army</span>
-        </div>
-        <div id="msg-overlay">
-            <h1>CROWD SURGE</h1>
-            <p>Slide to move • Hit gates to multiply • Destroy the Boss</p>
-            <button class="btn" onclick="startGame()">START MISSION</button>
-        </div>
+    <div id="ui"><div id="counter">1</div></div>
+    <div id="msg" id="startMenu">
+        <h1>VANGUARD SURGE</h1>
+        <button class="btn" onclick="initGame()">START GAME</button>
     </div>
-    <canvas id="stage"></canvas>
-</div>
+    <canvas id="g"></canvas>
 
 <script>
-/**
- * VANGUARD ENGINE v2.0
- * Features: Swarm Physics, Dynamic Math Gates, Enemy AI, Optimized Rendering
- */
-
-const canvas = document.getElementById('stage');
+const canvas = document.getElementById('g');
 const ctx = canvas.getContext('2d');
-const countDisplay = document.getElementById('count-val');
-const overlay = document.getElementById('msg-overlay');
+const counterEl = document.getElementById('counter');
+const menu = document.getElementById('msg');
 
-// GAME STATE
-let GAME = {
-    running: false,
-    width: 0,
-    height: 0,
-    scroll: 0,
-    speed: 5,
-    count: 1,
-    targetCount: 1,
-    playerX: 0,
-    lerpX: 0,
-    frame: 0
-};
+let w, h, playerX, targetX = 0, count = 1, running = false;
+let objects = [], particles = [], frame = 0;
 
-let units = [];
-let gates = [];
-let enemies = [];
-let particles = [];
-
-class Unit {
-    constructor() {
-        this.x = GAME.width / 2;
-        this.y = GAME.height - 150;
-        this.offX = (Math.random() - 0.5) * 40;
-        this.offY = (Math.random() - 0.5) * 40;
-        this.size = 6;
-    }
-    draw() {
-        ctx.fillStyle = '#00d2ff';
-        ctx.beginPath();
-        ctx.arc(this.x + this.offX, this.y + this.offY, this.size, 0, Math.PI*2);
-        ctx.fill();
-        // Glow effect
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = '#00d2ff';
-    }
-}
-
-class Gate {
-    constructor() {
-        this.w = 180;
-        this.h = 60;
-        this.x = Math.random() * (GAME.width - this.w);
-        this.y = -100;
-        this.isMult = Math.random() > 0.4;
-        this.val = this.isMult ? Math.floor(Math.random() * 3) + 2 : Math.floor(Math.random() * 20) + 10;
-        this.passed = false;
-    }
-    update() {
-        this.y += GAME.speed;
-        if (!this.passed && GAME.lerpX > this.x && GAME.lerpX < this.x + this.w && Math.abs(this.y - (GAME.height - 150)) < 20) {
-            this.passed = true;
-            if (this.isMult) GAME.targetCount *= this.val;
-            else GAME.targetCount += this.val;
-            spawnParticles(this.x + this.w/2, this.y);
-        }
-    }
-    draw() {
-        const color = this.isMult ? '#00d2ff' : '#00ff88';
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 3;
-        ctx.strokeRect(this.x, this.y, this.w, this.h);
-        ctx.fillStyle = 'rgba(0, 210, 255, 0.1)';
-        ctx.fillRect(this.x, this.y, this.w, this.h);
-        
-        ctx.fillStyle = 'white';
-        ctx.font = 'bold 24px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText((this.isMult ? 'x' : '+') + this.val, this.x + this.w/2, this.y + 38);
-    }
-}
-
-function spawnParticles(x, y) {
-    for(let i=0; i<10; i++) {
-        particles.push({x, y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, life: 1});
-    }
+function initGame() {
+    running = true;
+    count = 1;
+    objects = [];
+    menu.style.display = 'none';
 }
 
 function resize() {
-    GAME.width = Math.min(window.innerWidth, 500);
-    GAME.height = window.innerHeight;
-    canvas.width = GAME.width;
-    canvas.height = GAME.height;
-    GAME.playerX = GAME.width / 2;
-    GAME.lerpX = GAME.playerX;
+    w = canvas.width = window.innerWidth;
+    h = canvas.height = window.innerHeight;
+    playerX = targetX = w / 2;
 }
 
-function startGame() {
-    GAME.running = true;
-    GAME.count = 1;
-    GAME.targetCount = 1;
-    units = [new Unit()];
-    gates = [];
-    overlay.style.opacity = '0';
-    overlay.style.pointerEvents = 'none';
-}
-
-function update() {
-    if (!GAME.running) return;
-    GAME.frame++;
-
-    // Smooth movement
-    GAME.lerpX += (GAME.playerX - GAME.lerpX) * 0.15;
-
-    // Manage Count
-    if (Math.floor(GAME.count) < Math.floor(GAME.targetCount)) {
-        GAME.count += (GAME.targetCount - GAME.count) * 0.1;
-        if (units.length < 200) units.push(new Unit());
-    }
-    countDisplay.innerText = Math.floor(GAME.count);
-
-    // Spawn Gates
-    if (GAME.frame % 100 === 0) gates.push(new Gate());
-
-    gates.forEach((g, i) => {
-        g.update();
-        if (g.y > GAME.height) gates.splice(i, 1);
-    });
-
-    particles.forEach((p, i) => {
-        p.x += p.vx; p.y += p.vy; p.life -= 0.02;
-        if(p.life <= 0) particles.splice(i, 1);
-    });
-}
-
-function draw() {
-    ctx.clearRect(0, 0, GAME.width, GAME.height);
-
-    // Draw Road
-    ctx.fillStyle = '#1a1a1a';
-    ctx.fillRect(0, 0, GAME.width, GAME.height);
-    
-    // Grid lines
-    ctx.strokeStyle = '#333';
-    ctx.lineWidth = 1;
-    for(let i=0; i<GAME.height; i+=50) {
-        let y = (i + (GAME.frame * GAME.speed)) % GAME.height;
-        ctx.beginPath();
-        ctx.moveTo(0, y); ctx.lineTo(GAME.width, y);
-        ctx.stroke();
-    }
-
-    gates.forEach(g => g.draw());
-
-    // Draw Swarm
-    units.forEach((u, i) => {
-        u.x = GAME.lerpX;
-        u.draw();
-    });
-
-    // Particles
-    particles.forEach(p => {
-        ctx.fillStyle = `rgba(255,255,255,${p.life})`;
-        ctx.fillRect(p.x, p.y, 4, 4);
-    });
-
-    requestAnimationFrame(() => {
-        update();
-        draw();
-    });
-}
-
-// Controls
-window.addEventListener('mousemove', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    GAME.playerX = e.clientX - rect.left;
-});
-window.addEventListener('touchmove', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    GAME.playerX = e.touches[0].clientX - rect.left;
-});
-
+window.addEventListener('mousemove', e => targetX = e.clientX);
+window.addEventListener('touchmove', e => targetX = e.touches[0].clientX);
 window.addEventListener('resize', resize);
 resize();
-draw();
+
+function spawn() {
+    if (frame % 80 === 0) {
+        const isMult = Math.random() > 0.5;
+        objects.push({
+            x: Math.random() * (w - 150),
+            y: -100,
+            type: isMult ? 'x' : '+',
+            val: isMult ? Math.floor(Math.random() * 2) + 2 : Math.floor(Math.random() * 20) + 5,
+            color: isMult ? '#00d2ff' : '#00ff88'
+        });
+    }
+}
+
+function drawPlayer(x, y, count) {
+    // Draw the "Crowd" swarm
+    const size = 15 + Math.log10(count) * 8;
+    ctx.shadowBlur = 20;
+    ctx.shadowColor = '#00d2ff';
+    ctx.fillStyle = '#00d2ff';
+    
+    // Core
+    ctx.beginPath();
+    ctx.arc(x, y, size, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Orbiting "Soldiers"
+    for(let i=0; i < Math.min(count, 15); i++) {
+        let ang = (frame * 0.1) + (i * 0.8);
+        let dist = size + 5 + (i * 0.5);
+        ctx.beginPath();
+        ctx.arc(x + Math.cos(ang) * dist, y + Math.sin(ang) * dist, 4, 0, Math.PI*2);
+        ctx.fill();
+    }
+}
+
+function loop() {
+    ctx.fillStyle = '#050a10';
+    ctx.fillRect(0, 0, w, h);
+    
+    if (running) {
+        frame++;
+        spawn();
+        playerX += (targetX - playerX) * 0.15;
+        
+        objects.forEach((o, i) => {
+            o.y += 6;
+            // Draw Gate
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = o.color;
+            ctx.strokeStyle = o.color;
+            ctx.lineWidth = 4;
+            ctx.strokeRect(o.x, o.y, 150, 50);
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 20px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(o.type + o.val, o.x + 75, o.y + 32);
+
+            // Collision
+            if (Math.abs(o.y - (h - 150)) < 10 && playerX > o.x && playerX < o.x + 150) {
+                if (o.type === 'x') count *= o.val; else count += o.val;
+                objects.splice(i, 1);
+                counterEl.innerText = Math.floor(count);
+            }
+            if (o.y > h) objects.splice(i, 1);
+        });
+
+        drawPlayer(playerX, h - 150, count);
+    }
+    
+    requestAnimationFrame(loop);
+}
+loop();
 </script>
 </body>
 </html>
