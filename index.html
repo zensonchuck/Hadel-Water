@@ -2,22 +2,19 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>OHM-BLOX v3.1: SAFE SPAWN EDITION</title>
+    <title>Vanguard: Crowd Surge 3D</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; color: #0f0; font-family: 'Courier New', monospace; }
-        #ui-container { position: absolute; top: 20px; left: 20px; z-index: 10; padding: 15px; border: 2px solid #0f0; background: rgba(0,20,0,0.9); }
-        #instructions { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: #0f0; color: #000; padding: 10px 20px; font-weight: bold; }
-        canvas { display: block; }
+        body { margin: 0; overflow: hidden; background: #050505; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 20px; }
+        #counter { font-size: 48px; color: #fff; font-weight: bold; text-shadow: 0 0 10px rgba(0,180,255,0.8); background: rgba(0,0,0,0.3); padding: 10px 30px; border-radius: 50px; border: 2px solid #00b4ff; }
+        #instructions { color: rgba(255,255,255,0.6); margin-top: 10px; text-transform: uppercase; letter-spacing: 2px; }
     </style>
 </head>
 <body>
-    <div id="ui-container">
-        <div style="font-size: 20px; font-weight: bold;">SYSTEM: OHM-BLOX v3.1</div>
-        <div id="status">ZONE: SAFE_SPAWN_LOBBY</div>
-        <div id="coords">X:0 Y:0 Z:0</div>
-        <div id="progress-bar" style="width: 200px; height: 10; border: 1px solid #0f0; margin-top: 5px;"><div id="fill" style="background:#0f0; height:100%; width:0%;"></div></div>
+    <div id="ui-layer">
+        <div id="counter">1</div>
+        <div id="instructions">Slide to Lead the Swarm</div>
     </div>
-    <div id="instructions">CLICK TO BEGIN | SPACE TO JUMP</div>
 
     <script type="importmap">
         { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
@@ -26,123 +23,172 @@
     <script type="module">
         import * as THREE from 'three';
 
-        // --- ENGINE CONFIG ---
+        // --- GAME CONFIGURATION ---
+        const CONFIG = {
+            laneWidth: 10,
+            forwardSpeed: 0.2,
+            playerSideSpeed: 0.15,
+            gateSpawnInterval: 2000,
+            maxCrowdSize: 500 // Optimization limit
+        };
+
+        // --- ENGINE SETUP ---
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x000500);
-        scene.fog = new THREE.FogExp2(0x000500, 0.01);
+        scene.background = new THREE.Color(0x87ceeb);
+        scene.fog = new THREE.FogExp2(0x87ceeb, 0.02);
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
         document.body.appendChild(renderer.domElement);
 
-        scene.add(new THREE.AmbientLight(0x00ff00, 0.3));
-        const pLight = new THREE.PointLight(0x00ff00, 2, 30);
-        scene.add(pLight);
+        // Lighting
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
+        scene.add(hemiLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        dirLight.position.set(5, 10, 5);
+        dirLight.castShadow = true;
+        scene.add(dirLight);
 
-        // --- PLATFORM SYSTEM ---
-        const platforms = [];
-        
-        // 1. HUGE SAFE SPAWN PLATFORM (100x100)
-        const spawnGeo = new THREE.BoxGeometry(100, 2, 100);
-        const spawnMat = new THREE.MeshPhongMaterial({ color: 0x111111, emissive: 0x002200 });
-        const spawnPlatform = new THREE.Mesh(spawnGeo, spawnMat);
-        spawnPlatform.position.set(0, -1, 0); // Positioned at origin
-        scene.add(spawnPlatform);
-        platforms.push(spawnPlatform);
+        // --- GAME OBJECTS ---
+        const worldGroup = new THREE.Group();
+        scene.add(worldGroup);
 
-        // Add a grid helper to the spawn area so you can see movement
-        const grid = new THREE.GridHelper(100, 20, 0x00ff00, 0x004400);
-        grid.position.y = 0.01;
-        scene.add(grid);
+        // Road/Environment
+        const roadGeo = new THREE.PlaneGeometry(CONFIG.laneWidth, 2000);
+        const roadMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
+        const road = new THREE.Mesh(roadGeo, roadMat);
+        road.rotation.x = -Math.PI / 2;
+        road.receiveShadow = true;
+        worldGroup.add(road);
 
-        // 2. PROCEDURAL OBSTACLE COURSE
-        let lastZ = -60;
-        for (let i = 0; i < 40; i++) {
-            const bGeo = new THREE.BoxGeometry(5, 1, 5);
-            const bMat = new THREE.MeshPhongMaterial({ color: 0x00ff00, emissive: 0x003300 });
-            const b = new THREE.Mesh(bGeo, bMat);
-            b.position.set(Math.random() * 20 - 10, i * 2, lastZ);
-            scene.add(b);
-            platforms.push(b);
-            lastZ -= 10;
+        // Grid for "Speed" effect
+        const grid = new THREE.GridHelper(2000, 100, 0x00b4ff, 0x222222);
+        grid.position.y = 0.05;
+        worldGroup.add(grid);
+
+        // --- PLAYER & CROWD LOGIC ---
+        let soldierCount = 1;
+        const soldiers = [];
+        const playerState = { x: 0, targetX: 0 };
+
+        const soldierGeo = new THREE.CapsuleGeometry(0.15, 0.3, 4, 8);
+        const soldierMat = new THREE.MeshStandardMaterial({ color: 0x0066ff });
+
+        function updateCrowd(newCount) {
+            const diff = Math.floor(newCount) - soldiers.length;
+            if (diff > 0) {
+                for (let i = 0; i < diff; i++) {
+                    if (soldiers.length >= CONFIG.maxCrowdSize) break;
+                    const s = new THREE.Mesh(soldierGeo, soldierMat);
+                    s.castShadow = true;
+                    s.position.set(
+                        (Math.random() - 0.5) * 1.5, 
+                        0.25, 
+                        (Math.random() - 0.5) * 1.5
+                    );
+                    worldGroup.add(s);
+                    soldiers.push(s);
+                }
+            }
+            soldierCount = Math.max(1, Math.floor(newCount));
+            document.getElementById('counter').innerText = soldierCount;
         }
 
-        // --- PLAYER LOGIC ---
-        let player = {
-            pos: new THREE.Vector3(0, 10, 0), // Start HIGH above the platform to ensure landing
-            vel: new THREE.Vector3(),
-            rot: new THREE.Euler(0, 0, 0, 'YXZ'),
-            grounded: false
-        };
+        updateCrowd(1); // Start with 1
 
-        const keys = { w:false, a:false, s:false, d:false, space:false };
-        document.addEventListener('keydown', (e) => {
-            if(e.code === 'KeyW') keys.w = true; if(e.code === 'KeyS') keys.s = true;
-            if(e.code === 'KeyA') keys.a = true; if(e.code === 'KeyD') keys.d = true;
-            if(e.code === 'Space') keys.space = true;
-        });
-        document.addEventListener('keyup', (e) => {
-            if(e.code === 'KeyW') keys.w = false; if(e.code === 'KeyS') keys.s = false;
-            if(e.code === 'KeyA') keys.a = false; if(e.code === 'KeyD') keys.d = false;
-            if(e.code === 'Space') keys.space = false;
+        // --- GATES ---
+        const gates = [];
+        function spawnGate() {
+            const isMult = Math.random() > 0.5;
+            const val = isMult ? Math.floor(Math.random() * 3) + 2 : Math.floor(Math.random() * 20) + 5;
+            
+            const gateG = new THREE.Group();
+            const frameGeo = new THREE.BoxGeometry(4, 3, 0.5);
+            const frameMat = new THREE.MeshStandardMaterial({ 
+                color: isMult ? 0x00b4ff : 0x00ff88, 
+                transparent: true, 
+                opacity: 0.6 
+            });
+            const frame = new THREE.Mesh(frameGeo, frameMat);
+            frame.position.y = 1.5;
+            gateG.add(frame);
+            
+            gateG.position.set((Math.random() - 0.5) * 6, 0, -100);
+            gateG.userData = { isMult, val, hit: false };
+            
+            worldGroup.add(gateG);
+            gates.push(gateG);
+        }
+
+        // --- INPUTS ---
+        window.addEventListener('mousemove', (e) => {
+            playerState.targetX = (e.clientX / window.innerWidth - 0.5) * CONFIG.laneWidth;
         });
 
-        document.addEventListener('mousedown', () => {
-            document.body.requestPointerLock();
-            document.getElementById('instructions').style.display = 'none';
-        });
+        // --- MAIN GAME LOOP ---
+        camera.position.set(0, 8, 12);
+        camera.lookAt(0, 0, -5);
 
-        document.addEventListener('mousemove', (e) => {
-            if (document.pointerLockElement) {
-                player.rot.y -= e.movementX * 0.002;
-                player.rot.x = Math.max(-1.5, Math.min(1.5, player.rot.x - e.movementY * 0.002));
-            }
-        });
-
-        function animate() {
+        let lastSpawn = 0;
+        function animate(time) {
             requestAnimationFrame(animate);
 
-            // Movement math
-            const forward = new THREE.Vector3(0,0,-1).applyEuler(new THREE.Euler(0, player.rot.y, 0));
-            const right = new THREE.Vector3(1,0,0).applyEuler(new THREE.Euler(0, player.rot.y, 0));
-            
-            if(keys.w) player.vel.add(forward.multiplyScalar(0.01));
-            if(keys.s) player.vel.add(forward.multiplyScalar(-0.01));
-            if(keys.a) player.vel.add(right.multiplyScalar(-0.01));
-            if(keys.d) player.vel.add(right.multiplyScalar(0.01));
+            // Forward Movement
+            worldGroup.position.z += CONFIG.forwardSpeed;
 
-            player.vel.x *= 0.9; player.vel.z *= 0.9; // Friction
-            player.vel.y -= 0.01; // Gravity
-            
-            if(keys.space && player.grounded) { player.vel.y = 0.2; player.grounded = false; }
+            // Lateral Movement (Smoothing)
+            playerState.x += (playerState.targetX - playerState.x) * CONFIG.playerSideSpeed;
 
-            player.pos.add(player.vel);
+            // Update Soldiers Position (Swarm behavior)
+            soldiers.forEach((s, i) => {
+                const angle = (i / soldiers.length) * Math.PI * 2;
+                const radius = Math.sqrt(i) * 0.25;
+                const swarmX = Math.cos(angle) * radius;
+                const swarmZ = Math.sin(angle) * radius;
+                
+                s.position.x += (playerState.x + swarmX - s.position.x) * 0.1;
+                s.position.z = -worldGroup.position.z + swarmZ;
+            });
 
-            // COLLISION
-            player.grounded = false;
-            for(let p of platforms) {
-                const box = new THREE.Box3().setFromObject(p);
-                if(box.containsPoint(new THREE.Vector3(player.pos.x, player.pos.y - 1.5, player.pos.z))) {
-                    if(player.vel.y < 0) {
-                        player.pos.y = box.max.y + 1.5;
-                        player.vel.y = 0;
-                        player.grounded = true;
-                    }
+            // Gate Logic
+            if (time - lastSpawn > CONFIG.gateSpawnInterval) {
+                spawnGate();
+                lastSpawn = time;
+            }
+
+            for (let i = gates.length - 1; i >= 0; i--) {
+                const g = gates[i];
+                // Check Collision
+                const distZ = Math.abs(g.position.z + worldGroup.position.z);
+                const distX = Math.abs(g.position.x - playerState.x);
+
+                if (distZ < 0.5 && distX < 2 && !g.userData.hit) {
+                    g.userData.hit = true;
+                    const nextCount = g.userData.isMult ? soldierCount * g.userData.val : soldierCount + g.userData.val;
+                    updateCrowd(nextCount);
+                    g.visible = false;
+                }
+
+                if (g.position.z + worldGroup.position.z > 10) {
+                    worldGroup.remove(g);
+                    gates.splice(i, 1);
                 }
             }
 
-            // Fall Reset
-            if(player.pos.y < -30) { player.pos.set(0, 10, 0); player.vel.set(0,0,0); }
-
-            camera.position.copy(player.pos);
-            camera.rotation.copy(player.rot);
-            pLight.position.copy(player.pos);
-            
-            document.getElementById('coords').innerText = `X:${player.pos.x.toFixed(0)} Y:${player.pos.y.toFixed(0)} Z:${player.pos.z.toFixed(0)}`;
             renderer.render(scene, camera);
         }
-        animate();
+
+        animate(0);
+
+        // Handle Resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
     </script>
 </body>
 </html>
