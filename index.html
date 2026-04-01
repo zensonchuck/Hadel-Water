@@ -2,216 +2,333 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VANGUARD: SURGE MASTER</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>VANGUARD: ULTIMATE SURGE PRO</title>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; font-family: 'Segoe UI', sans-serif; }
-        #canvas-container { position: relative; width: 100vw; height: 100vh; }
-        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; display: flex; flex-direction: column; align-items: center; }
-        #counter-box { margin-top: 50px; background: rgba(0, 210, 255, 0.2); padding: 15px 50px; border-radius: 100px; border: 3px solid #00d2ff; backdrop-filter: blur(15px); box-shadow: 0 0 30px rgba(0, 210, 255, 0.5); }
-        #army-count { font-size: 72px; color: #fff; font-weight: 900; margin: 0; text-shadow: 0 0 20px #00d2ff; }
-        #instruction { position: absolute; bottom: 15%; color: rgba(255,255,255,0.7); font-weight: bold; letter-spacing: 3px; text-transform: uppercase; animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { opacity: 0.3; transform: scale(1); } 50% { opacity: 1; transform: scale(1.05); } 100% { opacity: 0.3; transform: scale(1); } }
-        #loading-screen { position: fixed; inset: 0; background: #050505; z-index: 1000; display: flex; justify-content: center; align-items: center; color: #00d2ff; font-size: 24px; font-weight: bold; }
+        :root { --p-color: #00d2ff; --s-color: #00ff88; --bg: #020408; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: var(--bg); font-family: 'Segoe UI', Tahoma, sans-serif; }
+        #app { position: relative; width: 100vw; height: 100vh; }
+        canvas { display: block; width: 100%; height: 100%; }
+
+        /* --- PROFESSIONAL HUD SYSTEM --- */
+        #hud { position: absolute; inset: 0; pointer-events: none; z-index: 10; display: flex; flex-direction: column; align-items: center; }
+        .top-bar { margin-top: 40px; perspective: 1000px; }
+        .counter-card { 
+            background: rgba(0, 0, 0, 0.7); 
+            padding: 15px 50px; 
+            border-radius: 20px; 
+            border: 2px solid var(--p-color); 
+            box-shadow: 0 0 30px rgba(0, 210, 255, 0.3), inset 0 0 15px rgba(0, 210, 255, 0.2);
+            backdrop-filter: blur(20px);
+            transform: rotateX(10deg);
+            text-align: center;
+        }
+        #army-val { font-size: 72px; font-weight: 900; color: #fff; margin: 0; text-shadow: 0 0 20px var(--p-color); }
+        .label { font-size: 12px; letter-spacing: 4px; text-transform: uppercase; color: var(--p-color); opacity: 0.8; }
+
+        /* --- GAME NOTIFICATIONS --- */
+        #notif-container { position: absolute; top: 180px; width: 100%; text-align: center; }
+        .notif { color: var(--s-color); font-weight: bold; font-size: 24px; animation: floatUp 1s ease-out forwards; }
+        @keyframes floatUp { 0% { opacity: 0; transform: translateY(20px); } 100% { opacity: 1; transform: translateY(-40px); } }
+
+        /* --- START OVERLAY --- */
+        #overlay { position: fixed; inset: 0; background: rgba(2, 4, 8, 0.95); z-index: 1000; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: opacity 0.5s; }
+        .title { font-size: 60px; font-weight: 900; color: #fff; letter-spacing: 10px; margin-bottom: 10px; }
+        .subtitle { color: var(--p-color); letter-spacing: 5px; margin-bottom: 50px; }
+        .start-btn { 
+            pointer-events: auto; 
+            background: transparent; 
+            border: 2px solid var(--p-color); 
+            color: #fff; 
+            padding: 20px 60px; 
+            font-size: 20px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            border-radius: 5px;
+            transition: all 0.3s;
+        }
+        .start-btn:hover { background: var(--p-color); color: #000; box-shadow: 0 0 50px var(--p-color); }
     </style>
 </head>
 <body>
 
-    <div id="loading-screen">INITIALIZING ULTIMATE RENDERER...</div>
-
-    <div id="ui-layer">
-        <div id="counter-box"><h1 id="army-count">1</h1></div>
-        <div id="instruction">DRAG TO LEAD YOUR ARMY</div>
+<div id="app">
+    <div id="overlay">
+        <h1 class="title">VANGUARD</h1>
+        <p class="subtitle">ULTRA-HD COMMANDER</p>
+        <button class="start-btn" onclick="Game.Start()">ENGAGE MISSION</button>
     </div>
 
-    <div id="canvas-container"></div>
+    <div id="hud">
+        <div class="top-bar">
+            <div class="counter-card">
+                <p class="label">Unit Strength</p>
+                <h1 id="army-val">1</h1>
+            </div>
+        </div>
+        <div id="notif-container"></div>
+    </div>
+</div>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
 
-    <script>
-        /** * VANGUARD ENGINE - DEFINITIVE PC BUILD
-         * Optimized for High-End GPU Performance
-         */
+<script>
+/**
+ * ============================================================
+ * VANGUARD GAME ENGINE v5.0 (PROFESSIONAL ARCHITECTURE)
+ * ============================================================
+ * This script is organized into Modular Sub-Systems to handle
+ * high-performance rendering on high-end hardware.
+ */
 
-        let scene, camera, renderer, clock;
-        let instancedSoldiers, dummy = new THREE.Object3D();
-        let army = [];
-        let gates = [];
-        let count = 1;
-        let isMoving = false;
-        let targetX = 0, lerpX = 0;
+const GameConfig = {
+    MAX_UNITS: 15000,
+    INITIAL_COUNT: 1,
+    ROAD_WIDTH: 16,
+    MOVE_SPEED: 0.95,
+    SWARM_SMOOTHING: 0.12,
+    GATE_SPAWN_Z: -250,
+    GATE_INTERVAL: 1200, // ms
+    COLOR_BLUE: 0x00d2ff,
+    COLOR_GREEN: 0x00ff88,
+};
+
+// --- CORE ENGINE ---
+const Game = {
+    isInitialized: false,
+    isRunning: false,
+    clock: new THREE.Clock(),
+    count: GameConfig.INITIAL_COUNT,
+    targetX: 0,
+    currentX: 0,
+
+    async Init() {
+        this.Renderer = new RendererSystem();
+        this.World = new WorldSystem();
+        this.Crowd = new CrowdSystem();
+        this.UI = new UISystem();
         
-        const MAX_UNITS = 10000; // PC high-end limit
-        const ROAD_WIDTH = 14;
+        this.BindInput();
+        this.isInitialized = true;
+        this.Loop();
+    },
 
-        // Initialize Engine
-        function init() {
-            scene = new THREE.Scene();
-            scene.background = new THREE.Color(0x020408);
-            scene.fog = new THREE.FogExp2(0x020408, 0.015);
+    Start() {
+        document.getElementById('overlay').style.opacity = '0';
+        setTimeout(() => document.getElementById('overlay').remove(), 500);
+        this.isRunning = true;
+    },
 
-            camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1500);
-            camera.position.set(0, 18, 30);
-            camera.lookAt(0, 2, -10);
+    BindInput() {
+        const handleMove = (x) => {
+            this.targetX = ((x / window.innerWidth) - 0.5) * GameConfig.ROAD_WIDTH;
+        };
+        window.addEventListener('mousemove', (e) => handleMove(e.clientX));
+        window.addEventListener('touchmove', (e) => handleMove(e.touches[0].clientX));
+        window.addEventListener('resize', () => this.Renderer.OnResize());
+    },
 
-            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(window.devicePixelRatio);
-            renderer.shadowMap.enabled = true;
-            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-            document.getElementById('canvas-container').appendChild(renderer.domElement);
+    Loop() {
+        const delta = this.clock.getDelta();
+        const elapsed = this.clock.getElapsedTime();
 
-            // Studio Lighting Setup
-            const ambient = new THREE.AmbientLight(0xffffff, 0.4);
-            scene.add(ambient);
-
-            const sun = new THREE.DirectionalLight(0x00d2ff, 1.8);
-            sun.position.set(20, 50, 20);
-            sun.castShadow = true;
-            sun.shadow.mapSize.width = 4096; // Ultra-HD shadows
-            sun.shadow.mapSize.height = 4096;
-            scene.add(sun);
-
-            // Infinite Floor Logic
-            const floorGeo = new THREE.PlaneGeometry(ROAD_WIDTH, 5000);
-            const floorMat = new THREE.MeshStandardMaterial({ color: 0x0a0a0a, roughness: 0.1, metalness: 0.3 });
-            const floor = new THREE.Mesh(floorGeo, floorMat);
-            floor.rotation.x = -Math.PI / 2;
-            floor.receiveShadow = true;
-            scene.add(floor);
-
-            const grid = new THREE.GridHelper(5000, 400, 0x00d2ff, 0x111111);
-            grid.position.y = 0.05;
-            scene.add(grid);
-
-            // Soldier System
-            const soldierGeo = new THREE.CapsuleGeometry(0.22, 0.5, 4, 10);
-            const soldierMat = new THREE.MeshStandardMaterial({ 
-                color: 0x00d2ff, 
-                emissive: 0x0066ff, 
-                emissiveIntensity: 0.6,
-                roughness: 0.1,
-                metalness: 0.8
-            });
-            instancedSoldiers = new THREE.InstancedMesh(soldierGeo, soldierMat, MAX_UNITS);
-            instancedSoldiers.castShadow = true;
-            scene.add(instancedSoldiers);
-
-            clock = new THREE.Clock();
-            
-            // Start with 1 soldier
-            for(let i=0; i<count; i++) spawnUnit();
-
-            // Hide Loader
-            document.getElementById('loading-screen').style.display = 'none';
-
-            window.addEventListener('pointermove', handleMove);
-            window.addEventListener('resize', onResize);
-            
-            animate();
+        if (this.isRunning) {
+            this.currentX += (this.targetX - this.currentX) * 0.15;
+            this.World.Update(delta);
+            this.Crowd.Update(this.currentX, elapsed);
+            this.CheckCollisions();
         }
 
-        function spawnUnit() {
-            if (army.length >= MAX_UNITS) return;
-            army.push({
-                x: (Math.random()-0.5) * 2,
-                z: (Math.random()-0.5) * 2,
-                v: Math.random() * 0.2, // Individual variance
-                id: army.length
-            });
-        }
+        this.Renderer.Render();
+        requestAnimationFrame(() => this.Loop());
+    },
 
-        function spawnGate() {
-            const isMult = Math.random() > 0.4;
-            const val = isMult ? Math.floor(Math.random()*3)+2 : Math.floor(Math.random()*25)+10;
-            const color = isMult ? 0x00d2ff : 0x00ff88;
+    CheckCollisions() {
+        const gates = this.World.gates;
+        for (let i = gates.length - 1; i >= 0; i--) {
+            const g = gates[i];
+            const distZ = Math.abs(g.mesh.position.z);
+            const distX = Math.abs(g.mesh.position.x - this.currentX);
 
-            const group = new THREE.Group();
-            const gateMesh = new THREE.Mesh(
-                new THREE.BoxGeometry(7, 5, 0.4),
-                new THREE.MeshStandardMaterial({ color: color, transparent: true, opacity: 0.5, emissive: color, emissiveIntensity: 2 })
-            );
-            gateMesh.position.y = 2.5;
-            group.add(gateMesh);
-            
-            group.position.set((Math.random()-0.5) * 8, 0, -150);
-            group.userData = { isMult, val, active: true };
-            scene.add(group);
-            gates.push(group);
-        }
+            if (!g.hit && distZ < 2 && distX < 4) {
+                g.hit = true;
+                g.mesh.visible = false;
+                const prev = this.count;
+                if (g.isMult) this.count *= g.val;
+                else this.count += g.val;
 
-        function handleMove(e) {
-            isMoving = true;
-            document.getElementById('instruction').style.display = 'none';
-            targetX = ((e.clientX / window.innerWidth) - 0.5) * ROAD_WIDTH;
-        }
-
-        function onResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-
-        let gateTimer = 0;
-        function animate() {
-            requestAnimationFrame(animate);
-            const delta = clock.getDelta();
-            const time = clock.getElapsedTime();
-
-            if (isMoving) {
-                lerpX += (targetX - lerpX) * 0.12;
-                gateTimer += delta;
-                if (gateTimer > 1.4) {
-                    spawnGate();
-                    gateTimer = 0;
-                }
+                this.Crowd.Sync(this.count);
+                this.UI.UpdateCount(this.count);
+                this.UI.Notify(g.isMult ? `x${g.val}` : `+${g.val}`);
             }
+        }
+    }
+};
 
-            // Move & Collide Gates
-            for (let i = gates.length - 1; i >= 0; i--) {
-                const g = gates[i];
-                if (isMoving) g.position.z += 0.8;
+// --- RENDERER SUBSYSTEM ---
+class RendererSystem {
+    constructor() {
+        this.scene = new THREE.Scene();
+        this.scene.background = new THREE.Color(0x020408);
+        this.scene.fog = new THREE.FogExp2(0x020408, 0.012);
 
-                if (g.userData.active && Math.abs(g.position.z) < 1.5 && Math.abs(g.position.x - lerpX) < 4) {
-                    g.userData.active = false;
-                    g.visible = false;
-                    const addAmount = g.userData.isMult ? (count * g.userData.val) - count : g.userData.val;
-                    for(let n=0; n<Math.min(addAmount, 200); n++) spawnUnit();
-                    count += addAmount;
-                    document.getElementById('army-count').innerText = Math.floor(count);
-                }
+        this.camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 2000);
+        this.camera.position.set(0, 18, 32);
+        this.camera.lookAt(0, 2, -10);
 
-                if (g.position.z > 50) {
-                    scene.remove(g);
-                    gates.splice(i, 1);
-                }
-            }
+        this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.setPixelRatio(window.devicePixelRatio);
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        
+        document.getElementById('app').appendChild(this.renderer.domElement);
 
-            // Swarm Simulation
-            army.forEach((unit, i) => {
-                const rowSize = Math.floor(Math.sqrt(army.length));
-                const spacing = 0.55;
-                
-                const goalX = lerpX + ((i % rowSize) - rowSize/2) * spacing;
-                const goalZ = Math.floor(i / rowSize) * spacing;
+        const amb = new THREE.AmbientLight(0xffffff, 0.4);
+        this.scene.add(amb);
 
-                unit.x += (goalX - unit.x) * 0.1;
-                unit.z += (goalZ - unit.z) * 0.1;
+        this.sun = new THREE.DirectionalLight(0xffffff, 1.8);
+        this.sun.position.set(30, 100, 30);
+        this.sun.castShadow = true;
+        this.sun.shadow.mapSize.set(2048, 2048);
+        this.scene.add(this.sun);
+    }
 
-                dummy.position.set(unit.x, 0.5 + Math.sin(time*10 + i)*0.1, unit.z);
-                dummy.rotation.x = Math.sin(time*12 + i) * 0.2; // Run lean
-                dummy.updateMatrix();
-                instancedSoldiers.setMatrixAt(i, dummy.matrix);
-            });
-            
-            instancedSoldiers.instanceMatrix.needsUpdate = true;
-            instancedSoldiers.count = Math.min(army.length, MAX_UNITS);
+    OnResize() {
+        this.camera.aspect = window.innerWidth / window.innerHeight;
+        this.camera.updateProjectionMatrix();
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+    }
 
-            renderer.render(scene, camera);
+    Render() {
+        this.renderer.render(this.scene, this.camera);
+    }
+}
+
+// --- WORLD SUBSYSTEM ---
+class WorldSystem {
+    constructor() {
+        this.gates = [];
+        this.lastGateTime = 0;
+        this.initEnvironment();
+    }
+
+    initEnvironment() {
+        const roadGeo = new THREE.PlaneGeometry(GameConfig.ROAD_WIDTH, 5000);
+        const roadMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.1, metalness: 0.5 });
+        const road = new THREE.Mesh(roadGeo, roadMat);
+        road.rotation.x = -Math.PI / 2;
+        road.receiveShadow = true;
+        Game.Renderer.scene.add(road);
+
+        const grid = new THREE.GridHelper(5000, 400, GameConfig.COLOR_BLUE, 0x0a0a0a);
+        grid.position.y = 0.05;
+        Game.Renderer.scene.add(grid);
+    }
+
+    SpawnGate() {
+        const isMult = Math.random() > 0.4;
+        const val = isMult ? Math.floor(Math.random()*3)+2 : Math.floor(Math.random()*30)+10;
+        const color = isMult ? GameConfig.COLOR_BLUE : GameConfig.COLOR_GREEN;
+
+        const gateMesh = new THREE.Mesh(
+            new THREE.BoxGeometry(7, 5, 0.5),
+            new THREE.MeshStandardMaterial({ color, transparent: true, opacity: 0.5, emissive: color, emissiveIntensity: 1 })
+        );
+        gateMesh.position.set((Math.random()-0.5)*8, 2.5, GameConfig.GATE_SPAWN_Z);
+        
+        Game.Renderer.scene.add(gateMesh);
+        this.gates.push({ mesh: gateMesh, isMult, val, hit: false });
+    }
+
+    Update(delta) {
+        const now = Date.now();
+        if (now - this.lastGateTime > GameConfig.GATE_INTERVAL) {
+            this.SpawnGate();
+            this.lastGateTime = now;
         }
 
-        // Force initialize
-        window.onload = init;
-    </script>
+        for (let i = this.gates.length - 1; i >= 0; i--) {
+            this.gates[i].mesh.position.z += GameConfig.MOVE_SPEED * 60 * delta;
+            if (this.gates[i].mesh.position.z > 50) {
+                Game.Renderer.scene.remove(this.gates[i].mesh);
+                this.gates.splice(i, 1);
+            }
+        }
+    }
+}
+
+// --- CROWD SUBSYSTEM (INSTANCED) ---
+class CrowdSystem {
+    constructor() {
+        this.army = [];
+        this.dummy = new THREE.Object3D();
+        
+        const geo = new THREE.CapsuleGeometry(0.22, 0.5, 4, 10);
+        const mat = new THREE.MeshStandardMaterial({ 
+            color: GameConfig.COLOR_BLUE, 
+            emissive: 0x0044ff, 
+            emissiveIntensity: 0.5,
+            metalness: 0.8,
+            roughness: 0.2
+        });
+
+        this.mesh = new THREE.InstancedMesh(geo, mat, GameConfig.MAX_UNITS);
+        this.mesh.castShadow = true;
+        Game.Renderer.scene.add(this.mesh);
+
+        this.Sync(GameConfig.INITIAL_COUNT);
+    }
+
+    Sync(newTotal) {
+        const diff = Math.min(newTotal, GameConfig.MAX_UNITS) - this.army.length;
+        if (diff > 0) {
+            for (let i = 0; i < diff; i++) {
+                this.army.push({
+                    pos: new THREE.Vector3(0, 0.5, 0),
+                    phase: Math.random() * Math.PI * 2
+                });
+            }
+        }
+    }
+
+    Update(centerX, time) {
+        const rowSize = Math.floor(Math.sqrt(this.army.length));
+        this.army.forEach((unit, i) => {
+            const spacing = 0.5;
+            const tx = centerX + ((i % rowSize) - rowSize/2) * spacing;
+            const tz = Math.floor(i / rowSize) * spacing;
+
+            unit.pos.x += (tx - unit.pos.x) * 0.15;
+            unit.pos.z += (tz - unit.pos.z) * 0.15;
+
+            this.dummy.position.set(unit.pos.x, 0.6 + Math.sin(time*10 + i)*0.1, unit.pos.z);
+            this.dummy.rotation.x = Math.sin(time*12 + i) * 0.2;
+            this.dummy.updateMatrix();
+            this.mesh.setMatrixAt(i, this.dummy.matrix);
+        });
+        this.mesh.instanceMatrix.needsUpdate = true;
+        this.mesh.count = this.army.length;
+    }
+}
+
+// --- UI SUBSYSTEM ---
+class UISystem {
+    UpdateCount(val) {
+        document.getElementById('army-val').innerText = Math.floor(val);
+    }
+    Notify(text) {
+        const n = document.createElement('div');
+        n.className = 'notif';
+        n.innerText = text;
+        document.getElementById('notif-container').appendChild(n);
+        setTimeout(() => n.remove(), 1000);
+    }
+}
+
+// --- BOOT ---
+window.onload = () => Game.Init();
+
+</script>
 </body>
 </html>
