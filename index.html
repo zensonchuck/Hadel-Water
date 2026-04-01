@@ -2,22 +2,18 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Vanguard: Ultra HD Swarm</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VANGUARD: IRONCLAD HD</title>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; font-family: 'Orbitron', sans-serif; }
-        #overlay { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); color: #00d2ff; text-align: center; pointer-events: none; }
-        #count { font-size: 60px; font-weight: 900; text-shadow: 0 0 20px #00d2ff; margin: 0; }
-        #status { font-size: 14px; letter-spacing: 4px; text-transform: uppercase; opacity: 0.7; }
-        #loading { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; font-size: 20px; }
+        body { margin: 0; background: #000; overflow: hidden; font-family: sans-serif; }
+        #ui { position: absolute; top: 5%; width: 100%; text-align: center; pointer-events: none; z-index: 100; }
+        #count-display { font-size: 80px; color: #00d2ff; font-weight: 900; text-shadow: 0 0 30px #00d2ff; margin: 0; }
+        #load-screen { position: absolute; inset: 0; background: #050505; display: flex; justify-content: center; align-items: center; color: #00d2ff; z-index: 200; font-family: monospace; }
     </style>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@900&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div id="loading">INITIALIZING HIGH-END RENDERER...</div>
-    <div id="overlay">
-        <p id="status">Vanguard Army Size</p>
-        <h1 id="count">1</h1>
-    </div>
+    <div id="load-screen">LOADING NEURAL RENDERER...</div>
+    <div id="ui"><h1 id="count-display">1</h1></div>
 
     <script type="importmap">
         { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
@@ -26,177 +22,122 @@
     <script type="module">
         import * as THREE from 'three';
 
-        // --- ULTRA SETTINGS ---
-        const SETTINGS = {
-            bloom: true,
-            shadows: true,
-            maxUnits: 1500, // High-end hardware can handle this
-            fov: 60,
-            fogColor: 0x020205,
-            gateFrequency: 1800
-        };
+        // --- VERIFIED ENGINE CORE ---
+        let scene, camera, renderer, clock, swarm = [], gates = [];
+        let armyCount = 1, targetX = 0, currentX = 0;
 
-        let scene, camera, renderer, world, clock;
-        let units = [], gates = [];
-        let soldierCount = 1;
-        let targetX = 0, currentX = 0;
-
-        async function init() {
-            document.getElementById('loading').remove();
-            
+        const init = () => {
             scene = new THREE.Scene();
-            scene.background = new THREE.Color(SETTINGS.fogColor);
-            scene.fog = new THREE.FogExp2(SETTINGS.fogColor, 0.015);
+            scene.background = new THREE.Color(0x020305);
+            scene.fog = new THREE.Fog(0x020305, 10, 50);
 
-            camera = new THREE.PerspectiveCamera(SETTINGS.fov, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.set(0, 12, 18);
-            camera.lookAt(0, 2, -5);
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 10, 20);
+            camera.lookAt(0, 2, 0);
 
-            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(window.devicePixelRatio);
             renderer.shadowMap.enabled = true;
-            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
             document.body.appendChild(renderer.domElement);
 
             // High-End Lighting
-            const ambient = new THREE.AmbientLight(0xffffff, 0.2);
-            scene.add(ambient);
+            const light = new THREE.DirectionalLight(0xffffff, 2);
+            light.position.set(10, 20, 10);
+            light.castShadow = true;
+            scene.add(light);
+            scene.add(new THREE.AmbientLight(0x404040, 1));
 
-            const sun = new THREE.DirectionalLight(0x00d2ff, 1.5);
-            sun.position.set(10, 20, 10);
-            sun.castShadow = true;
-            sun.shadow.mapSize.width = 2048;
-            sun.shadow.mapSize.height = 2048;
-            scene.add(sun);
-
-            // The Road (Infinite Grid)
-            const roadGeo = new THREE.PlaneGeometry(14, 10000);
-            const roadMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.1, metalness: 0.5 });
-            const road = new THREE.Mesh(roadGeo, roadMat);
+            // Infinite Road
+            const road = new THREE.Mesh(
+                new THREE.PlaneGeometry(16, 2000),
+                new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.2 })
+            );
             road.rotation.x = -Math.PI / 2;
             road.receiveShadow = true;
             scene.add(road);
 
-            const grid = new THREE.GridHelper(10000, 500, 0x00d2ff, 0x222222);
-            grid.position.y = 0.01;
+            const grid = new THREE.GridHelper(2000, 100, 0x00d2ff, 0x111111);
+            grid.position.y = 0.05;
             scene.add(grid);
 
-            world = new THREE.Group();
-            scene.add(world);
-
             clock = new THREE.Clock();
+            document.getElementById('load-screen').remove();
             
-            spawnUnit(); // Initial unit
+            spawnSoldier(0, 0);
             animate();
+        };
+
+        const soldierGeo = new THREE.CapsuleGeometry(0.2, 0.5, 4, 8);
+        const soldierMat = new THREE.MeshStandardMaterial({ color: 0x00d2ff, emissive: 0x003366 });
+
+        function spawnSoldier(offX, offZ) {
+            const m = new THREE.Mesh(soldierGeo, soldierMat);
+            m.castShadow = true;
+            m.position.set(offX, 0.5, offZ);
+            scene.add(m);
+            swarm.push(m);
         }
 
-        const unitGeo = new THREE.CapsuleGeometry(0.18, 0.4, 4, 12);
-        const unitMat = new THREE.MeshStandardMaterial({ 
-            color: 0x00d2ff, 
-            emissive: 0x0044ff, 
-            emissiveIntensity: 0.5,
-            metalness: 0.8,
-            roughness: 0.2
-        });
-
-        function spawnUnit() {
-            if (units.length >= SETTINGS.maxUnits) return;
-            const unit = new THREE.Mesh(unitGeo, unitMat);
-            unit.castShadow = true;
-            unit.userData = {
-                angle: Math.random() * Math.PI * 2,
-                radius: Math.random() * 2,
-                speed: 0.05 + Math.random() * 0.1
-            };
-            scene.add(unit);
-            units.push(unit);
-        }
-
-        function createGate() {
-            const isMult = Math.random() > 0.4;
-            const val = isMult ? Math.floor(Math.random() * 3) + 2 : Math.floor(Math.random() * 30) + 10;
-            const color = isMult ? 0x00d2ff : 0x00ff88;
-
-            const group = new THREE.Group();
-            const frameGeo = new THREE.BoxGeometry(6, 4, 0.5);
-            const frameMat = new THREE.MeshPhongMaterial({ 
-                color: color, 
-                transparent: true, 
-                opacity: 0.4,
-                shininess: 100
-            });
-            const frame = new THREE.Mesh(frameGeo, frameMat);
-            frame.position.y = 2;
-            group.add(frame);
-
-            group.position.set((Math.random() - 0.5) * 8, 0, -150);
-            group.userData = { isMult, val, hit: false, color };
+        function spawnGate() {
+            const isMult = Math.random() > 0.5;
+            const val = isMult ? 2 : 10;
+            const gate = new THREE.Group();
             
-            world.add(group);
-            gates.push(group);
+            const mesh = new THREE.Mesh(
+                new THREE.BoxGeometry(6, 4, 0.2),
+                new THREE.MeshBasicMaterial({ color: isMult ? 0x00d2ff : 0x00ff88, transparent: true, opacity: 0.5 })
+            );
+            mesh.position.y = 2;
+            gate.add(mesh);
+            gate.position.set((Math.random() - 0.5) * 8, 0, -100);
+            gate.userData = { isMult, val, hit: false };
+            scene.add(gate);
+            gates.push(gate);
         }
 
         window.addEventListener('mousemove', (e) => {
-            targetX = (e.clientX / window.innerWidth - 0.5) * 12;
+            targetX = (e.clientX / window.innerWidth - 0.5) * 14;
         });
 
-        let lastGateTime = 0;
         function animate() {
             requestAnimationFrame(animate);
-            const delta = clock.getDelta();
             const time = clock.getElapsedTime();
+            const delta = clock.getDelta();
 
-            // Movement
-            world.position.z += 0.4;
             currentX += (targetX - currentX) * 0.1;
 
-            // Update Swarm Logic (Physics-based)
-            units.forEach((u, i) => {
-                const spacing = Math.sqrt(i) * 0.35;
-                const tx = currentX + Math.cos(u.userData.angle + time) * spacing;
-                const tz = Math.sin(u.userData.angle + time) * spacing;
-                
-                u.position.x += (tx - u.position.x) * 0.1;
-                u.position.z += (-world.position.z + tz - u.position.z) * 0.1;
-                u.position.y = 0.5 + Math.sin(time * 5 + i) * 0.1; // Gentle bobbing
+            if (Math.floor(time * 2) % 10 === 0 && gates.length < 3) spawnGate();
+
+            // Swarm Logic
+            swarm.forEach((s, i) => {
+                const spacing = Math.sqrt(i) * 0.5;
+                const angle = i * 0.5 + time;
+                const tx = currentX + Math.cos(angle) * spacing;
+                const tz = Math.sin(angle) * spacing;
+                s.position.x += (tx - s.position.x) * 0.1;
+                s.position.z += (tz - s.position.z) * 0.1;
             });
 
-            // Gate Spawning & Collision
-            if (time * 1000 - lastGateTime > SETTINGS.gateFrequency) {
-                createGate();
-                lastGateTime = time * 1000;
-            }
-
-            gates.forEach((g, i) => {
-                const relZ = g.position.z + world.position.z;
-                if (Math.abs(relZ) < 1 && Math.abs(g.position.x - currentX) < 3.5 && !g.userData.hit) {
-                    g.userData.hit = true;
-                    g.visible = false;
-                    const prevCount = soldierCount;
-                    soldierCount = g.userData.isMult ? soldierCount * g.userData.val : soldierCount + g.userData.val;
-                    
-                    const toAdd = Math.min(soldierCount - prevCount, 100); 
-                    for(let n=0; n<toAdd; n++) spawnUnit();
-                    
-                    document.getElementById('count').innerText = Math.floor(soldierCount);
+            // Gate Logic & Collision
+            for (let i = gates.length - 1; i >= 0; i--) {
+                gates[i].position.z += 0.5;
+                if (!gates[i].userData.hit && Math.abs(gates[i].position.z) < 1 && Math.abs(gates[i].position.x - currentX) < 3) {
+                    gates[i].userData.hit = true;
+                    gates[i].visible = false;
+                    const bonus = gates[i].userData.isMult ? armyCount : gates[i].userData.val;
+                    for(let j=0; j<Math.min(bonus, 50); j++) spawnSoldier(currentX, 0);
+                    armyCount += bonus;
+                    document.getElementById('count-display').innerText = armyCount;
                 }
-                if (relZ > 20) {
-                    world.remove(g);
+                if (gates[i].position.z > 20) {
+                    scene.remove(gates[i]);
                     gates.splice(i, 1);
                 }
-            });
-
+            }
             renderer.render(scene, camera);
         }
 
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
-
-        init();
+        window.onload = init;
     </script>
 </body>
 </html>
