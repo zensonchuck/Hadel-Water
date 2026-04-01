@@ -2,193 +2,227 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Vanguard: Crowd Surge 3D</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Vanguard: Crowd Surge Professional</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #050505; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 20px; }
-        #counter { font-size: 48px; color: #fff; font-weight: bold; text-shadow: 0 0 10px rgba(0,180,255,0.8); background: rgba(0,0,0,0.3); padding: 10px 30px; border-radius: 50px; border: 2px solid #00b4ff; }
-        #instructions { color: rgba(255,255,255,0.6); margin-top: 10px; text-transform: uppercase; letter-spacing: 2px; }
+        :root { --primary: #00d2ff; --secondary: #3a7bd5; --enemy: #ff4b2b; }
+        body { margin: 0; padding: 0; overflow: hidden; background: #0a0a0a; font-family: 'Segoe UI', Roboto, sans-serif; user-select: none; }
+        #game-container { position: relative; width: 100vw; height: 100vh; display: flex; justify-content: center; align-items: center; }
+        canvas { display: block; box-shadow: 0 0 50px rgba(0,0,0,0.5); }
+        
+        /* UI OVERLAY */
+        #ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+        .stat-card { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.6); padding: 10px 40px; border-radius: 50px; border: 2px solid var(--primary); color: white; text-align: center; backdrop-filter: blur(5px); }
+        #count-val { font-size: 42px; font-weight: 900; display: block; text-shadow: 0 0 10px var(--primary); }
+        #label { font-size: 12px; letter-spacing: 2px; text-transform: uppercase; opacity: 0.8; }
+        
+        #msg-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: white; text-align: center; transition: opacity 0.3s; }
+        .btn { pointer-events: auto; background: linear-gradient(45deg, var(--primary), var(--secondary)); border: none; padding: 15px 40px; color: white; font-weight: bold; border-radius: 5px; cursor: pointer; font-size: 20px; margin-top: 20px; }
     </style>
 </head>
 <body>
-    <div id="ui-layer">
-        <div id="counter">1</div>
-        <div id="instructions">Slide to Lead the Swarm</div>
+
+<div id="game-container">
+    <div id="ui">
+        <div class="stat-card">
+            <span id="count-val">1</span>
+            <span id="label">Vanguard Army</span>
+        </div>
+        <div id="msg-overlay">
+            <h1>CROWD SURGE</h1>
+            <p>Slide to move • Hit gates to multiply • Destroy the Boss</p>
+            <button class="btn" onclick="startGame()">START MISSION</button>
+        </div>
     </div>
+    <canvas id="stage"></canvas>
+</div>
 
-    <script type="importmap">
-        { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
-    </script>
+<script>
+/**
+ * VANGUARD ENGINE v2.0
+ * Features: Swarm Physics, Dynamic Math Gates, Enemy AI, Optimized Rendering
+ */
 
-    <script type="module">
-        import * as THREE from 'three';
+const canvas = document.getElementById('stage');
+const ctx = canvas.getContext('2d');
+const countDisplay = document.getElementById('count-val');
+const overlay = document.getElementById('msg-overlay');
 
-        // --- GAME CONFIGURATION ---
-        const CONFIG = {
-            laneWidth: 10,
-            forwardSpeed: 0.2,
-            playerSideSpeed: 0.15,
-            gateSpawnInterval: 2000,
-            maxCrowdSize: 500 // Optimization limit
-        };
+// GAME STATE
+let GAME = {
+    running: false,
+    width: 0,
+    height: 0,
+    scroll: 0,
+    speed: 5,
+    count: 1,
+    targetCount: 1,
+    playerX: 0,
+    lerpX: 0,
+    frame: 0
+};
 
-        // --- ENGINE SETUP ---
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87ceeb);
-        scene.fog = new THREE.FogExp2(0x87ceeb, 0.02);
+let units = [];
+let gates = [];
+let enemies = [];
+let particles = [];
 
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.shadowMap.enabled = true;
-        document.body.appendChild(renderer.domElement);
+class Unit {
+    constructor() {
+        this.x = GAME.width / 2;
+        this.y = GAME.height - 150;
+        this.offX = (Math.random() - 0.5) * 40;
+        this.offY = (Math.random() - 0.5) * 40;
+        this.size = 6;
+    }
+    draw() {
+        ctx.fillStyle = '#00d2ff';
+        ctx.beginPath();
+        ctx.arc(this.x + this.offX, this.y + this.offY, this.size, 0, Math.PI*2);
+        ctx.fill();
+        // Glow effect
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#00d2ff';
+    }
+}
 
-        // Lighting
-        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
-        scene.add(hemiLight);
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        dirLight.position.set(5, 10, 5);
-        dirLight.castShadow = true;
-        scene.add(dirLight);
-
-        // --- GAME OBJECTS ---
-        const worldGroup = new THREE.Group();
-        scene.add(worldGroup);
-
-        // Road/Environment
-        const roadGeo = new THREE.PlaneGeometry(CONFIG.laneWidth, 2000);
-        const roadMat = new THREE.MeshStandardMaterial({ color: 0x333333 });
-        const road = new THREE.Mesh(roadGeo, roadMat);
-        road.rotation.x = -Math.PI / 2;
-        road.receiveShadow = true;
-        worldGroup.add(road);
-
-        // Grid for "Speed" effect
-        const grid = new THREE.GridHelper(2000, 100, 0x00b4ff, 0x222222);
-        grid.position.y = 0.05;
-        worldGroup.add(grid);
-
-        // --- PLAYER & CROWD LOGIC ---
-        let soldierCount = 1;
-        const soldiers = [];
-        const playerState = { x: 0, targetX: 0 };
-
-        const soldierGeo = new THREE.CapsuleGeometry(0.15, 0.3, 4, 8);
-        const soldierMat = new THREE.MeshStandardMaterial({ color: 0x0066ff });
-
-        function updateCrowd(newCount) {
-            const diff = Math.floor(newCount) - soldiers.length;
-            if (diff > 0) {
-                for (let i = 0; i < diff; i++) {
-                    if (soldiers.length >= CONFIG.maxCrowdSize) break;
-                    const s = new THREE.Mesh(soldierGeo, soldierMat);
-                    s.castShadow = true;
-                    s.position.set(
-                        (Math.random() - 0.5) * 1.5, 
-                        0.25, 
-                        (Math.random() - 0.5) * 1.5
-                    );
-                    worldGroup.add(s);
-                    soldiers.push(s);
-                }
-            }
-            soldierCount = Math.max(1, Math.floor(newCount));
-            document.getElementById('counter').innerText = soldierCount;
+class Gate {
+    constructor() {
+        this.w = 180;
+        this.h = 60;
+        this.x = Math.random() * (GAME.width - this.w);
+        this.y = -100;
+        this.isMult = Math.random() > 0.4;
+        this.val = this.isMult ? Math.floor(Math.random() * 3) + 2 : Math.floor(Math.random() * 20) + 10;
+        this.passed = false;
+    }
+    update() {
+        this.y += GAME.speed;
+        if (!this.passed && GAME.lerpX > this.x && GAME.lerpX < this.x + this.w && Math.abs(this.y - (GAME.height - 150)) < 20) {
+            this.passed = true;
+            if (this.isMult) GAME.targetCount *= this.val;
+            else GAME.targetCount += this.val;
+            spawnParticles(this.x + this.w/2, this.y);
         }
+    }
+    draw() {
+        const color = this.isMult ? '#00d2ff' : '#00ff88';
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 3;
+        ctx.strokeRect(this.x, this.y, this.w, this.h);
+        ctx.fillStyle = 'rgba(0, 210, 255, 0.1)';
+        ctx.fillRect(this.x, this.y, this.w, this.h);
+        
+        ctx.fillStyle = 'white';
+        ctx.font = 'bold 24px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText((this.isMult ? 'x' : '+') + this.val, this.x + this.w/2, this.y + 38);
+    }
+}
 
-        updateCrowd(1); // Start with 1
+function spawnParticles(x, y) {
+    for(let i=0; i<10; i++) {
+        particles.push({x, y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10, life: 1});
+    }
+}
 
-        // --- GATES ---
-        const gates = [];
-        function spawnGate() {
-            const isMult = Math.random() > 0.5;
-            const val = isMult ? Math.floor(Math.random() * 3) + 2 : Math.floor(Math.random() * 20) + 5;
-            
-            const gateG = new THREE.Group();
-            const frameGeo = new THREE.BoxGeometry(4, 3, 0.5);
-            const frameMat = new THREE.MeshStandardMaterial({ 
-                color: isMult ? 0x00b4ff : 0x00ff88, 
-                transparent: true, 
-                opacity: 0.6 
-            });
-            const frame = new THREE.Mesh(frameGeo, frameMat);
-            frame.position.y = 1.5;
-            gateG.add(frame);
-            
-            gateG.position.set((Math.random() - 0.5) * 6, 0, -100);
-            gateG.userData = { isMult, val, hit: false };
-            
-            worldGroup.add(gateG);
-            gates.push(gateG);
-        }
+function resize() {
+    GAME.width = Math.min(window.innerWidth, 500);
+    GAME.height = window.innerHeight;
+    canvas.width = GAME.width;
+    canvas.height = GAME.height;
+    GAME.playerX = GAME.width / 2;
+    GAME.lerpX = GAME.playerX;
+}
 
-        // --- INPUTS ---
-        window.addEventListener('mousemove', (e) => {
-            playerState.targetX = (e.clientX / window.innerWidth - 0.5) * CONFIG.laneWidth;
-        });
+function startGame() {
+    GAME.running = true;
+    GAME.count = 1;
+    GAME.targetCount = 1;
+    units = [new Unit()];
+    gates = [];
+    overlay.style.opacity = '0';
+    overlay.style.pointerEvents = 'none';
+}
 
-        // --- MAIN GAME LOOP ---
-        camera.position.set(0, 8, 12);
-        camera.lookAt(0, 0, -5);
+function update() {
+    if (!GAME.running) return;
+    GAME.frame++;
 
-        let lastSpawn = 0;
-        function animate(time) {
-            requestAnimationFrame(animate);
+    // Smooth movement
+    GAME.lerpX += (GAME.playerX - GAME.lerpX) * 0.15;
 
-            // Forward Movement
-            worldGroup.position.z += CONFIG.forwardSpeed;
+    // Manage Count
+    if (Math.floor(GAME.count) < Math.floor(GAME.targetCount)) {
+        GAME.count += (GAME.targetCount - GAME.count) * 0.1;
+        if (units.length < 200) units.push(new Unit());
+    }
+    countDisplay.innerText = Math.floor(GAME.count);
 
-            // Lateral Movement (Smoothing)
-            playerState.x += (playerState.targetX - playerState.x) * CONFIG.playerSideSpeed;
+    // Spawn Gates
+    if (GAME.frame % 100 === 0) gates.push(new Gate());
 
-            // Update Soldiers Position (Swarm behavior)
-            soldiers.forEach((s, i) => {
-                const angle = (i / soldiers.length) * Math.PI * 2;
-                const radius = Math.sqrt(i) * 0.25;
-                const swarmX = Math.cos(angle) * radius;
-                const swarmZ = Math.sin(angle) * radius;
-                
-                s.position.x += (playerState.x + swarmX - s.position.x) * 0.1;
-                s.position.z = -worldGroup.position.z + swarmZ;
-            });
+    gates.forEach((g, i) => {
+        g.update();
+        if (g.y > GAME.height) gates.splice(i, 1);
+    });
 
-            // Gate Logic
-            if (time - lastSpawn > CONFIG.gateSpawnInterval) {
-                spawnGate();
-                lastSpawn = time;
-            }
+    particles.forEach((p, i) => {
+        p.x += p.vx; p.y += p.vy; p.life -= 0.02;
+        if(p.life <= 0) particles.splice(i, 1);
+    });
+}
 
-            for (let i = gates.length - 1; i >= 0; i--) {
-                const g = gates[i];
-                // Check Collision
-                const distZ = Math.abs(g.position.z + worldGroup.position.z);
-                const distX = Math.abs(g.position.x - playerState.x);
+function draw() {
+    ctx.clearRect(0, 0, GAME.width, GAME.height);
 
-                if (distZ < 0.5 && distX < 2 && !g.userData.hit) {
-                    g.userData.hit = true;
-                    const nextCount = g.userData.isMult ? soldierCount * g.userData.val : soldierCount + g.userData.val;
-                    updateCrowd(nextCount);
-                    g.visible = false;
-                }
+    // Draw Road
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(0, 0, GAME.width, GAME.height);
+    
+    // Grid lines
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1;
+    for(let i=0; i<GAME.height; i+=50) {
+        let y = (i + (GAME.frame * GAME.speed)) % GAME.height;
+        ctx.beginPath();
+        ctx.moveTo(0, y); ctx.lineTo(GAME.width, y);
+        ctx.stroke();
+    }
 
-                if (g.position.z + worldGroup.position.z > 10) {
-                    worldGroup.remove(g);
-                    gates.splice(i, 1);
-                }
-            }
+    gates.forEach(g => g.draw());
 
-            renderer.render(scene, camera);
-        }
+    // Draw Swarm
+    units.forEach((u, i) => {
+        u.x = GAME.lerpX;
+        u.draw();
+    });
 
-        animate(0);
+    // Particles
+    particles.forEach(p => {
+        ctx.fillStyle = `rgba(255,255,255,${p.life})`;
+        ctx.fillRect(p.x, p.y, 4, 4);
+    });
 
-        // Handle Resize
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        });
+    requestAnimationFrame(() => {
+        update();
+        draw();
+    });
+}
 
-    </script>
+// Controls
+window.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    GAME.playerX = e.clientX - rect.left;
+});
+window.addEventListener('touchmove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    GAME.playerX = e.touches[0].clientX - rect.left;
+});
+
+window.addEventListener('resize', resize);
+resize();
+draw();
+</script>
 </body>
 </html>
