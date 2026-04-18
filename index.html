@@ -1,160 +1,305 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Tile Survive - Browser Edition</title>
+    <meta charset="UTF-8">
+    <title>Tile Survive - Pro Edition</title>
     <style>
-        body { margin: 0; background: #222; display: flex; justify-content: center; align-items: center; height: 100vh; color: white; font-family: sans-serif; overflow: hidden; }
-        canvas { background: #2d5a27; border: 5px solid #333; cursor: crosshair; }
-        #ui { position: absolute; top: 20px; left: 20px; pointer-events: none; }
+        body { margin: 0; background: #1a1a1a; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; color: white; }
+        #game-container { position: relative; border: 8px solid #333; border-radius: 10px; box-shadow: 0 0 50px rgba(0,0,0,0.5); }
+        canvas { background: #3d7a35; display: block; image-rendering: pixelated; }
+        #ui-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; padding: 20px; box-sizing: border-box; }
+        .stat-box { background: rgba(0,0,0,0.7); padding: 10px 20px; border-radius: 5px; margin-bottom: 10px; border-left: 4px solid #ffcc00; display: inline-block; min-width: 150px; }
+        .wood-text { color: #d2b48c; font-weight: bold; font-size: 24px; }
+        .hp-bar-bg { width: 200px; height: 20px; background: #444; border-radius: 10px; overflow: hidden; margin-top: 5px; }
+        #hp-fill { width: 100%; height: 100%; background: linear-gradient(90deg, #ff4b2b, #ff416c); transition: width 0.3s; }
+        #build-prompt { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); padding: 10px 20px; border-radius: 20px; border: 1px solid #fff; }
     </style>
 </head>
 <body>
-    <div id="ui">
-        <h1>WOOD: <span id="wood">0</span></h1>
-        <h3>REACTOR: <span id="health">100</span>%</h3>
-        <p>Click to Shoot | Collect Wood | Protect the Center</p>
+
+<div id="game-container">
+    <canvas id="canvas"></canvas>
+    <div id="ui-layer">
+        <div class="stat-box">
+            <div>WOOD LOGS</div>
+            <div class="wood-text">🪵 <span id="wood-val">0</span></div>
+        </div>
+        <br>
+        <div class="stat-box">
+            <div>REACTOR CORE</div>
+            <div class="hp-bar-bg"><div id="hp-fill"></div></div>
+        </div>
+        <div id="build-prompt">🔨 Walk near ghosts and Click to Build Wall (Cost: 25 Wood)</div>
     </div>
-    <canvas id="gameCanvas"></canvas>
+</div>
 
 <script>
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-canvas.width = 800;
-canvas.height = 600;
+/**
+ * TILE SURVIVE - PROFESSIONAL CORE SCRIPT
+ * Features: Dynamic Y-Sorting, Particle Systems, Resource Loop, Wall Building
+ */
 
-// Game State
-let wood = 0;
-let reactorHealth = 100;
-let player = { x: 400, y: 300, size: 20 };
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const woodDisplay = document.getElementById('wood-val');
+const hpDisplay = document.getElementById('hp-fill');
+
+canvas.width = 900;
+canvas.height = 700;
+
+// --- GAME STATE ---
+let gameState = {
+    wood: 100,
+    reactorHP: 100,
+    maxHP: 100,
+    frame: 0,
+    cameraShake: 0
+};
+
+const player = {
+    x: 450, y: 350,
+    targetX: 450, targetY: 350,
+    size: 25, speed: 0.15,
+    color: '#3498db'
+};
+
+const reactor = { x: 450, y: 350, size: 80 };
 let enemies = [];
 let bullets = [];
-let resources = [];
-let frame = 0;
+let drops = [];
+let walls = [];
+let particles = [];
+let wallGhosts = [];
 
-// Input
-let mouse = { x: 400, y: 300 };
-window.addEventListener('mousemove', e => {
-    const rect = canvas.getBoundingClientRect();
-    mouse.x = e.clientX - rect.left;
-    mouse.y = e.clientY - rect.top;
-});
-
-window.addEventListener('mousedown', () => {
-    bullets.push({
-        x: player.x,
-        y: player.y,
-        angle: Math.atan2(mouse.y - player.y, mouse.x - player.x),
-        speed: 7
-    });
-});
-
-function spawnEnemy() {
-    const side = Math.floor(Math.random() * 4);
-    let x, y;
-    if(side === 0) { x = Math.random() * canvas.width; y = -20; }
-    else if(side === 1) { x = canvas.width + 20; y = Math.random() * canvas.height; }
-    else if(side === 2) { x = Math.random() * canvas.width; y = canvas.height + 20; }
-    else { x = -20; y = Math.random() * canvas.height; }
-    enemies.push({ x, y, speed: 1.2, health: 1 });
+// Initialize Grid/Walls for Building
+for(let i = 0; i < 4; i++) {
+    // Basic starting layout
+    wallGhosts.push({ x: 350 + (i * 70), y: 450, active: false });
 }
 
-function update() {
-    frame++;
-    if (frame % 60 === 0) spawnEnemy(); // Spawn every second
+// --- UTILS ---
+const dist = (x1, y1, x2, y2) => Math.sqrt((x2-x1)**2 + (y2-y1)**2);
 
-    // Move Player (Smooth follow)
-    player.x += (mouse.x - player.x) * 0.1;
-    player.y += (mouse.y - player.y) * 0.1;
+// --- INPUT ---
+canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    player.targetX = e.clientX - rect.left;
+    player.targetY = e.clientY - rect.top;
+});
 
-    // Update Bullets
-    bullets.forEach((b, i) => {
-        b.x += Math.cos(b.angle) * b.speed;
-        b.y += Math.sin(b.angle) * b.speed;
-        if(b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height) bullets.splice(i, 1);
+canvas.addEventListener('mousedown', () => {
+    // Check if clicking near a build ghost
+    let built = false;
+    wallGhosts.forEach(g => {
+        if (dist(player.targetX, player.targetY, g.x, g.y) < 40 && gameState.wood >= 25) {
+            walls.push({ x: g.x, y: g.y, hp: 100 });
+            gameState.wood -= 25;
+            spawnParticles(g.x, g.y, '#d2b48c', 10);
+            built = true;
+        }
     });
 
-    // Update Enemies
-    enemies.forEach((en, i) => {
-        const dx = 400 - en.x; // Head to reactor (center)
-        const dy = 300 - en.y;
-        const dist = Math.sqrt(dx*dx + dy*dy);
-        en.x += (dx/dist) * en.speed;
-        en.y += (dy/dist) * en.speed;
+    if (!built) {
+        bullets.push({
+            x: player.x, y: player.y,
+            vx: (player.targetX - player.x) * 0.08,
+            vy: (player.targetY - player.y) * 0.08,
+            life: 100
+        });
+    }
+});
 
-        if(dist < 40) { // Touching reactor
-            reactorHealth -= 0.1;
+function spawnParticles(x, y, color, count) {
+    for(let i=0; i<count; i++) {
+        particles.push({
+            x, y, 
+            vx: (Math.random()-0.5) * 5, 
+            vy: (Math.random()-0.5) * 5, 
+            life: 1, 
+            color
+        });
+    }
+}
+
+// --- CORE LOOP ---
+function update() {
+    gameState.frame++;
+
+    // 1. Player Movement
+    player.x += (player.targetX - player.x) * player.speed;
+    player.y += (player.targetY - player.y) * player.speed;
+
+    // 2. Enemy Spawning (Waves)
+    if (gameState.frame % 80 === 0) {
+        let angle = Math.random() * Math.PI * 2;
+        enemies.push({
+            x: 450 + Math.cos(angle) * 600,
+            y: 350 + Math.sin(angle) * 600,
+            hp: 2,
+            speed: 1 + (gameState.frame / 5000)
+        });
+    }
+
+    // 3. Enemy Logic
+    enemies.forEach((en, i) => {
+        // Target: Reactor or Walls
+        let target = reactor;
+        walls.forEach(w => { if(dist(en.x, en.y, w.x, w.y) < 100) target = w; });
+
+        let angle = Math.atan2(target.y - en.y, target.x - en.x);
+        en.x += Math.cos(angle) * en.speed;
+        en.y += Math.sin(angle) * en.speed;
+
+        // Collision with walls
+        walls.forEach((w, wi) => {
+            if (dist(en.x, en.y, w.x, w.y) < 30) {
+                w.hp -= 0.2;
+                if (w.hp <= 0) walls.splice(wi, 1);
+            }
+        });
+
+        // Collision with Reactor
+        if (dist(en.x, en.y, reactor.x, reactor.y) < 50) {
+            gameState.reactorHP -= 0.1;
+            gameState.cameraShake = 5;
             enemies.splice(i, 1);
         }
+    });
 
-        // Bullet Collision
-        bullets.forEach((b, bi) => {
-            if(Math.hypot(b.x - en.x, b.y - en.y) < 20) {
-                resources.push({ x: en.x, y: en.y }); // Drop wood
-                enemies.splice(i, 1);
-                bullets.splice(bi, 1);
+    // 4. Bullet Logic
+    bullets.forEach((b, i) => {
+        b.x += b.vx; b.y += b.vy;
+        enemies.forEach((en, ei) => {
+            if (dist(b.x, b.y, en.x, en.y) < 25) {
+                en.hp--;
+                bullets.splice(i, 1);
+                if (en.hp <= 0) {
+                    drops.push({ x: en.x, y: en.y });
+                    enemies.splice(ei, 1);
+                    spawnParticles(en.x, en.y, '#4a90e2', 8);
+                }
             }
         });
     });
 
-    // Resource Collection
-    resources.forEach((r, i) => {
-        if(Math.hypot(player.x - r.x, player.y - r.y) < 30) {
-            wood += 5;
-            resources.splice(i, 1);
-            document.getElementById('wood').innerText = wood;
+    // 5. Collection
+    drops.forEach((d, i) => {
+        if (dist(player.x, player.y, d.x, d.y) < 40) {
+            gameState.wood += 5;
+            drops.splice(i, 1);
         }
     });
 
-    document.getElementById('health').innerText = Math.max(0, Math.floor(reactorHealth));
+    // 6. Particles
+    particles.forEach((p, i) => {
+        p.x += p.vx; p.y += p.vy; p.life -= 0.02;
+        if(p.life <= 0) particles.splice(i, 1);
+    });
+
+    // UI Update
+    woodDisplay.innerText = gameState.wood;
+    hpDisplay.style.width = gameState.reactorHP + '%';
+    if(gameState.cameraShake > 0) gameState.cameraShake *= 0.9;
 }
 
 function draw() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Draw Grid
-    ctx.strokeStyle = "rgba(255,255,255,0.05)";
-    for(let i=0; i<canvas.width; i+=40) {
-        ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke();
-        ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(canvas.width,i); ctx.stroke();
+    ctx.save();
+    // Camera Shake
+    if(gameState.cameraShake > 1) {
+        ctx.translate((Math.random()-0.5)*gameState.cameraShake, (Math.random()-0.5)*gameState.cameraShake);
     }
 
-    // Draw Reactor
-    ctx.fillStyle = "#ffcc00";
-    ctx.fillRect(370, 270, 60, 60);
-    ctx.strokeStyle = "white";
-    ctx.strokeRect(370, 270, 60, 60);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Draw Resources (Wood)
-    ctx.fillStyle = "#8B4513";
-    resources.forEach(r => {
-        ctx.beginPath(); ctx.arc(r.x, r.y, 8, 0, Math.PI*2); ctx.fill();
+    // Draw Grass Grid
+    ctx.strokeStyle = "rgba(0,0,0,0.1)";
+    for(let i=0; i<canvas.width; i+=50) {
+        ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke();
+    }
+
+    // DRAW ORDER (Y-Sorting)
+    let renderList = [
+        ...enemies.map(e => ({...e, type:'enemy'})),
+        ...walls.map(w => ({...w, type:'wall'})),
+        ...drops.map(d => ({...d, type:'drop'})),
+        {...player, type:'player'},
+        {...reactor, type:'reactor'}
+    ];
+    renderList.sort((a, b) => a.y - b.y);
+
+    renderList.forEach(obj => {
+        if(obj.type === 'reactor') {
+            // Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.2)';
+            ctx.beginPath(); ctx.ellipse(obj.x, obj.y+30, 40, 20, 0, 0, Math.PI*2); ctx.fill();
+            // Body (Cooling Tower)
+            ctx.fillStyle = '#ecf0f1';
+            ctx.fillRect(obj.x-30, obj.y-50, 60, 80);
+            ctx.fillStyle = '#ffcc00';
+            ctx.beginPath(); ctx.moveTo(obj.x-10, obj.y-10); ctx.lineTo(obj.x+10, obj.y-10); ctx.lineTo(obj.x, obj.y+10); ctx.fill();
+        }
+        
+        if(obj.type === 'player') {
+            ctx.fillStyle = '#e67e22';
+            ctx.beginPath(); ctx.arc(obj.x, obj.y, 20, 0, Math.PI*2); ctx.fill();
+            // Weapon
+            ctx.strokeStyle = '#333'; ctx.lineWidth = 5;
+            ctx.beginPath(); ctx.moveTo(obj.x, obj.y); ctx.lineTo(player.targetX, player.targetY); // Laser guide
+            ctx.setLineDash([5, 15]); ctx.stroke(); ctx.setLineDash([]);
+        }
+
+        if(obj.type === 'enemy') {
+            ctx.fillStyle = '#4a90e2';
+            ctx.beginPath(); ctx.arc(obj.x, obj.y, 15, 0, Math.PI*2); ctx.fill();
+            ctx.fillStyle = 'white'; // Eyes
+            ctx.fillRect(obj.x-8, obj.y-5, 4, 4); ctx.fillRect(obj.x+4, obj.y-5, 4, 4);
+        }
+
+        if(obj.type === 'wall') {
+            ctx.fillStyle = '#8B4513';
+            ctx.fillRect(obj.x-30, obj.y-40, 60, 50);
+            ctx.strokeStyle = '#5D2906'; ctx.strokeRect(obj.x-30, obj.y-40, 60, 50);
+        }
+
+        if(obj.type === 'drop') {
+            ctx.fillStyle = '#d2b48c';
+            ctx.beginPath(); ctx.arc(obj.x, obj.y, 8, 0, Math.PI*2); ctx.fill();
+        }
     });
 
-    // Draw Enemies (Blue Guys)
-    ctx.fillStyle = "#4a90e2";
-    enemies.forEach(en => {
-        ctx.beginPath(); ctx.arc(en.x, en.y, 12, 0, Math.PI*2); ctx.fill();
+    // Draw Ghosts
+    wallGhosts.forEach(g => {
+        ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+        ctx.strokeRect(g.x-30, g.y-40, 60, 50);
     });
 
-    // Draw Bullets
-    ctx.fillStyle = "yellow";
-    bullets.forEach(b => {
-        ctx.beginPath(); ctx.arc(b.x, b.y, 4, 0, Math.PI*2); ctx.fill();
+    // Bullets & Particles
+    ctx.fillStyle = 'yellow';
+    bullets.forEach(b => ctx.fillRect(b.x, b.y, 6, 6));
+    particles.forEach(p => {
+        ctx.globalAlpha = p.life;
+        ctx.fillStyle = p.color;
+        ctx.fillRect(p.x, p.y, 4, 4);
     });
+    ctx.globalAlpha = 1;
 
-    // Draw Player
-    ctx.fillStyle = "#e67e22";
-    ctx.beginPath(); ctx.arc(player.x, player.y, player.size, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
 }
 
-function gameLoop() {
+function main() {
     update();
     draw();
-    if(reactorHealth > 0) requestAnimationFrame(gameLoop);
-    else alert("Game Over! The Reactor was destroyed.");
+    if(gameState.reactorHP > 0) requestAnimationFrame(main);
+    else {
+        ctx.fillStyle = "rgba(0,0,0,0.8)";
+        ctx.fillRect(0,0,900,700);
+        ctx.fillStyle = "white";
+        ctx.font = "40px Arial";
+        ctx.fillText("REACTOR OVERLOADED", 250, 350);
+    }
 }
 
-gameLoop();
+main();
 </script>
 </body>
 </html>
