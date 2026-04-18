@@ -2,355 +2,408 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>TILE SURVIVE - PRE-ALPHA 0.8 PRO TOTYPE</title>
+    <title>TILE SURVIVE: ULTIMATE EDITION</title>
+    <link href="https://fonts.googleapis.com/css2?family=Bangers&family=Roboto:wght@700&display=swap" rel="stylesheet">
     <style>
-        body { margin: 0; background: #121212; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: 'Rubik', sans-serif; overflow: hidden; color: white; -webkit-font-smoothing: antialiased; }
-        #frame { position: relative; border: 12px solid #2a2a2a; border-radius: 15px; box-shadow: 0 0 80px rgba(0,0,0,0.8); overflow: hidden; }
-        canvas { background: #3c7a36; display: block; image-rendering: pixelated; /* Essential for crisp 3D rendering */ }
+        body { margin: 0; background: #0a0a0a; display: flex; justify-content: center; align-items: center; height: 100vh; font-family: 'Roboto', sans-serif; overflow: hidden; color: white; }
+        #game-wrapper { position: relative; border: 10px solid #222; border-radius: 20px; box-shadow: 0 0 100px rgba(0,0,0,1); cursor: crosshair; }
+        canvas { background: #2d5a27; display: block; image-rendering: auto; }
         
-        /* -- PURE UI OVERLAY (Non-Interactive) -- */
-        #ui-root { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; padding: 25px; box-sizing: border-box; }
-        .ui-box { background: rgba(0,0,0,0.85); border-radius: 8px; border-left: 5px solid #ffcc00; padding: 15px 20px; max-width: 250px; display: inline-block; margin-bottom: 12px; }
+        /* UI OVERLAY */
+        #ui { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; padding: 30px; box-sizing: border-box; }
+        .stat-card { background: rgba(0,0,0,0.8); padding: 15px; border-radius: 12px; border-left: 6px solid #f1c40f; margin-bottom: 15px; display: flex; align-items: center; width: fit-content; min-width: 200px; box-shadow: 5px 5px 15px rgba(0,0,0,0.5); }
+        .icon { font-size: 32px; margin-right: 15px; }
+        .val { font-size: 28px; color: #fff; font-family: 'Bangers', cursive; letter-spacing: 2px; }
+        .label { font-size: 12px; color: #aaa; text-transform: uppercase; display: block; }
         
-        /* Stats Styling */
-        .wood-icon { font-size: 28px; vertical-align: middle; color: #d2b48c; margin-right: 10px; }
-        .energy-icon { font-size: 28px; vertical-align: middle; color: #ffeb3b; margin-right: 10px; }
-        .stat-val { font-size: 26px; font-weight: 700; color: #fff; vertical-align: middle; }
-        .stat-label { font-size: 14px; font-weight: 400; text-transform: uppercase; color: #aaa; letter-spacing: 1px; display: block; }
-
-        /* HP Bars */
-        .reactor-hp-bg { width: 100%; height: 25px; background: #333; border-radius: 12px; overflow: hidden; margin-top: 10px; border: 1px solid #555; }
-        #reactor-hp-fill { width: 100%; height: 100%; background: linear-gradient(90deg, #ff4b2b, #ff416c); transition: width 0.3s; }
-
-        /* Pop-up UI (Building) */
-        #prompt { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.9); padding: 12px 24px; border-radius: 20px; border: 1px solid #444; color: #aaa; font-size: 14px; }
+        #health-container { position: absolute; top: 30px; right: 30px; text-align: right; }
+        .hp-bar { width: 300px; height: 30px; background: #333; border-radius: 15px; border: 3px solid #000; overflow: hidden; position: relative; }
+        #hp-fill { width: 100%; height: 100%; background: linear-gradient(to right, #e74c3c, #ff7675); transition: width 0.2s; }
+        
+        #build-menu { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 20px; }
+        .build-btn { pointer-events: auto; background: #2ecc71; color: white; padding: 15px 30px; border-radius: 50px; border: none; font-family: 'Bangers'; font-size: 20px; cursor: pointer; transition: 0.2s; box-shadow: 0 5px 0 #27ae60; }
+        .build-btn:hover { transform: translateY(-3px); box-shadow: 0 8px 0 #27ae60; }
+        .build-btn:active { transform: translateY(2px); box-shadow: 0 2px 0 #27ae60; }
     </style>
 </head>
 <body>
 
-<div id="frame">
-    <canvas id="canvas"></canvas>
-    
-    <div id="ui-root">
-        <div class="ui-box">
-            <div><span class="wood-icon">🪵</span> <span class="stat-val" id="wood-val">0</span><span class="stat-label">Wood Logs</span></div>
-            <div><span class="energy-icon">⚡</span> <span class="stat-val" id="energy-val">450</span><span class="stat-label">Energy</span></div>
+<div id="game-wrapper">
+    <canvas id="gameCanvas"></canvas>
+    <div id="ui">
+        <div class="stat-card">
+            <span class="icon">🪵</span>
+            <div><span class="label">Inventory</span><span class="val" id="wood-ui">0</span></div>
         </div>
-        <br>
-        
-        <div class="ui-box">
-            <div><span class="stat-label">Reactor Core Status</span></div>
-            <div class="reactor-hp-bg"><div id="reactor-hp-fill"></div></div>
+        <div class="stat-card" style="border-left-color: #3498db;">
+            <span class="icon">⚡</span>
+            <div><span class="label">Energy</span><span class="val">450</span></div>
         </div>
 
-        <div id="prompt">🔨 Walk near build ghosts and Click to construct Wall (Cost: 25 Wood)</div>
+        <div id="health-container">
+            <span class="label" style="margin-bottom: 5px;">Reactor Integrity</span>
+            <div class="hp-bar"><div id="hp-fill"></div></div>
+        </div>
+
+        <div id="build-menu">
+            <button class="build-btn" onclick="setBuildMode('wall')">BUILD WALL (50 Wood)</button>
+        </div>
     </div>
 </div>
 
 <script>
-/**
- * TILE SURVIVE - PROFESSIONAL CORE RE-ENGINEERING
- * Techniques: Sprite Sheet Loading, Dynamic Depth (Y-Sorting), High-Fidelity Particles, 
- * State-Driven Combat Loop, Camera Shake, Entity Pool
+/** * TILE SURVIVE: PRO ENGINE v1.0 
+ * Procedural Art, Y-Sorting, Vector Physics, Dynamic Lighting
  */
 
-const canvas = document.getElementById('canvas');
+const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-const woodDisplay = document.getElementById('wood-val');
-const reactorHPFill = document.getElementById('reactor-hp-fill');
+canvas.width = 1200;
+canvas.height = 800;
 
-// Internal Rendering Resolution (high for crispness)
-canvas.width = 1280; 
-canvas.height = 960;
+// --- CORE CONFIG ---
+const CONFIG = {
+    WOOD_COST_WALL: 50,
+    ENEMY_SPAWN_RATE: 120, // Frames
+    REACTOR_X: 600,
+    REACTOR_Y: 450,
+    GRID_SIZE: 80
+};
 
-// 1. GAME SYSTEMS: CONFIG & POOLING (Pro practice for handling hundreds of entities)
-let gameState = {
-    wood: 120,
-    reactorHP: 100,
-    cameraShake: 0,
+let state = {
+    wood: 150,
+    hp: 100,
     frame: 0,
-    lastSpawn: 0
+    shake: 0,
+    buildMode: null,
+    gameOver: false
 };
 
-// --- SPRITE ASSET DEFINITION ---
-// These are currently placeholder rectangles, but professional logic uses images.
-const Sprites = {
-    Tree: { w: 100, h: 140, color: '#2d5a27', isLoaded: false }, // Placeholder Pine
-    BlueGuy: { w: 40, h: 40, color: '#4a90e2' }, // Placeholder Alien
-    Reactor: { w: 120, h: 180, color: '#eee' },
-    Player: { w: 60, h: 60, color: '#e67e22' },
-    Wall: { w: 80, h: 60, color: '#8B4513' }
+// --- ENTITY POOLS ---
+let trees = [];
+let enemies = [];
+let bullets = [];
+let particles = [];
+let drops = [];
+let buildings = [];
+
+const player = {
+    x: 600, y: 550,
+    tx: 600, ty: 550,
+    w: 40, h: 40,
+    angle: 0,
+    anim: 0
 };
 
-// 2. ENTITY POOLING (Crucial for performance with high counts)
-const MAX_ENTITIES = { enemies: 200, particles: 500, drops: 100 };
-const EntityPools = {
-    enemies: [],
-    bullets: [],
-    particles: [],
-    drops: [],
-    walls: []
-};
-
-const Player = { x: 640, y: 480, targetX: 640, targetY: 480, speed: 0.12 };
-const Reactor = { x: 640, y: 480, size: 120, hp: 100 };
-
-// Initial Base Setup (Matches Ad Layout)
-EntityPools.walls.push({ x: 500, y: 620, hp: 100 });
-EntityPools.walls.push({ x: 580, y: 620, hp: 100 });
-EntityPools.walls.push({ x: 660, y: 620, hp: 100 });
-EntityPools.walls.push({ x: 740, y: 620, hp: 100 });
-
-// Tree Line (Creates the dense environment boundary)
-let treePool = [];
-for (let i = 0; i < 80; i++) {
-    treePool.push({
-        x: (i % 20) * (canvas.width/20), 
-        y: Math.random() * (canvas.height/1.5), // Top density
-        type: 'tree'
-    });
-}
-
-// 3. CORE SYSTEMS INTERACTION & INPUT
-canvas.addEventListener('mousemove', (e) => {
-    const rect = canvas.getBoundingClientRect();
-    Player.targetX = e.clientX - rect.left;
-    Player.targetY = e.clientY - rect.top;
-});
-
-canvas.addEventListener('mousedown', () => {
-    // Shooting System (High Velocity)
-    const angle = Math.atan2(Player.targetY - Player.y, Player.targetX - Player.x);
-    EntityPools.bullets.push({
-        x: Player.x, y: Player.y,
-        vx: Math.cos(angle) * 15,
-        vy: Math.sin(angle) * 15,
-        life: 60 // Framelife
-    });
-});
-
-// Particle System (High Fidelity Visual Feedback)
-function spawnParticles(x, y, color, count, velocity) {
-    if (EntityPools.particles.length > MAX_ENTITIES.particles) return;
-    for (let i = 0; i < count; i++) {
-        EntityPools.particles.push({
-            x, y,
-            vx: (Math.random() - 0.5) * velocity,
-            vy: (Math.random() - 0.5) * velocity,
-            life: 1.0, // Decay
-            color,
-            size: Math.random() * 4 + 2
-        });
-    }
-}
-
-// 4. MAIN GAME LOOP: UPDATE (Professionally Separated Logic)
-function updateGame() {
-    gameState.frame++;
-
-    // Camera Shake Decay (Adrenaline feedback)
-    gameState.cameraShake *= 0.9;
-    if (gameState.cameraShake < 0.1) gameState.cameraShake = 0;
-
-    // Player smooth movement
-    Player.x += (Player.targetX - Player.x) * Player.speed;
-    Player.y += (Player.targetY - Player.y) * Player.speed;
-
-    // Wave Spawning (Dynamic difficulty increase)
-    if (gameState.frame - gameState.lastSpawn > Math.max(20, 100 - (gameState.frame/1000))) {
-        let spawnAngle = Math.random() * Math.PI * 2;
-        let dist = canvas.width / 1.5;
-        if (EntityPools.enemies.length < MAX_ENTITIES.enemies) {
-            EntityPools.enemies.push({
-                x: Reactor.x + Math.cos(spawnAngle) * dist,
-                y: Reactor.y + Math.sin(spawnAngle) * dist,
-                hp: 1, // Basic unit
-                speed: 1.5,
-                angle: 0 // Used for animation/rotation
-            });
-        }
-        gameState.lastSpawn = gameState.frame;
-    }
-
-    // Bullet System & Collision (Hitscan approximation)
-    EntityPools.bullets.forEach((b, bi) => {
-        b.x += b.vx; b.y += b.vy; b.life--;
-        if (b.life <= 0) EntityPools.bullets.splice(bi, 1);
-
-        // Enemy Collision (Iterate through pools safely)
-        for (let ei = EntityPools.enemies.length - 1; ei >= 0; ei--) {
-            let en = EntityPools.enemies[ei];
-            const dx = b.x - en.x;
-            const dy = b.y - en.y;
-            if (dx*dx + dy*dy < 25*25) { // Radial collision
-                spawnParticles(en.x, en.y, Sprites.BlueGuy.color, 12, 6); // Splatter
-                EntityPools.enemies.splice(ei, 1);
-                EntityPools.bullets.splice(bi, 1);
-                EntityPools.drops.push({ x: en.x, y: en.y, angle: Math.random()*3.14 }); // Drop wood
-                return; // Early return for bi performance
-            }
-        }
-    });
-
-    // Enemy AI & Base Interaction
-    EntityPools.enemies.forEach((en) => {
-        const dx = Reactor.x - en.x;
-        const dy = Reactor.y - en.y;
-        en.angle = Math.atan2(dy, dx);
-        en.x += Math.cos(en.angle) * en.speed;
-        en.y += Math.sin(en.angle) * en.speed;
-
-        // Collision with walls
-        EntityPools.walls.forEach(w => {
-            if (Math.hypot(w.x - en.x, w.y - en.y) < 40) {
-                w.hp -= 0.1;
-                // ...handle wall destruction and attack FX here...
-            }
-        });
-
-        // Dynamic targeting (simple range check for REACTOR)
-        if (Math.hypot(dx, dy) < Reactor.size/1.5) {
-            gameState.reactorHP -= 0.05;
-            gameState.cameraShake = 5; // Intense feedback
-        }
-    });
-
-    // Collection System
-    for (let di = EntityPools.drops.length - 1; di >= 0; di--) {
-        let d = EntityPools.drops[di];
-        if (Math.hypot(d.x - Player.x, d.y - Player.y) < 50) {
-            gameState.wood += 5;
-            spawnParticles(d.x, d.y, '#fff', 4, 3); // Pickup flash
-            EntityPools.drops.splice(di, 1);
-        }
-    }
-
-    // Particle decay loop
-    for (let pi = EntityPools.particles.length - 1; pi >= 0; pi--) {
-        let p = EntityPools.particles[pi];
-        p.x += p.vx; p.y += p.vy;
-        p.life -= 0.02; // Decay rate
-        p.vx *= 0.98; p.vy *= 0.98; // Friction
-        if (p.life <= 0) EntityPools.particles.splice(pi, 1);
-    }
-
-    // UI Feedback (Separated from render loop)
-    woodDisplay.innerText = gameState.wood;
-    reactorHPFill.style.width = gameState.reactorHP + '%';
-}
-
-// 5. MAIN GAME LOOP: DRAW (High Performance & Depth)
-function drawGame() {
+// --- PROCEDURAL ART GENERATORS ---
+function drawTree(ctx, x, y) {
     ctx.save();
-    // Camera Shake Implementation
-    if (gameState.cameraShake > 0) {
-        ctx.translate((Math.random() - 0.5) * gameState.cameraShake, (Math.random() - 0.5) * gameState.cameraShake);
+    ctx.translate(x, y);
+    // Shadow
+    ctx.fillStyle = "rgba(0,0,0,0.2)";
+    ctx.beginPath(); ctx.ellipse(0, 5, 40, 15, 0, 0, Math.PI*2); ctx.fill();
+    // Trunk
+    ctx.fillStyle = "#5d4037";
+    ctx.fillRect(-8, -10, 16, 20);
+    // Leaves (3 Tiers)
+    ctx.fillStyle = "#2d5a27";
+    for(let i=0; i<3; i++) {
+        ctx.beginPath();
+        ctx.moveTo(0, -80 + (i*20));
+        ctx.lineTo(35 - (i*5), -20 + (i*20));
+        ctx.lineTo(-35 + (i*5), -20 + (i*20));
+        ctx.fill();
     }
+    ctx.restore();
+}
 
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+function drawReactor(ctx, x, y) {
+    ctx.save();
+    ctx.translate(x, y);
+    // Glow
+    let pulse = Math.sin(state.frame * 0.1) * 10;
+    let grd = ctx.createRadialGradient(0, 0, 10, 0, 0, 100 + pulse);
+    grd.addColorStop(0, "rgba(52, 152, 219, 0.4)");
+    grd.addColorStop(1, "rgba(52, 152, 219, 0)");
+    ctx.fillStyle = grd;
+    ctx.beginPath(); ctx.arc(0, 0, 150, 0, Math.PI*2); ctx.fill();
 
-    // 5a. Ground Layer (Matches dense forest floor)
-    ctx.fillStyle = "#3c7a36"; ctx.fillRect(0,0, canvas.width, canvas.height);
+    // Tower Body
+    ctx.fillStyle = "#dfe6e9";
+    ctx.beginPath();
+    ctx.moveTo(-50, 60); ctx.lineTo(-40, -60);
+    ctx.quadraticCurveTo(0, -75, 40, -60);
+    ctx.lineTo(50, 60); ctx.fill();
+
+    // Tower Rings
+    ctx.strokeStyle = "#b2bec3"; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(-45, 20); ctx.lineTo(45, 20); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-42, -20); ctx.lineTo(42, -20); ctx.stroke();
+
+    // Lightning Bolt Icon
+    ctx.fillStyle = "#f1c40f";
+    ctx.beginPath();
+    ctx.moveTo(-10, -10); ctx.lineTo(10, -30); ctx.lineTo(5, -10); ctx.lineTo(15, 10); ctx.lineTo(-5, 30); ctx.lineTo(0, 10); ctx.fill();
     
-    // Simple Grid (Helps depth perception)
-    ctx.strokeStyle = "rgba(0,0,0,0.15)"; ctx.lineWidth = 1;
-    for(let i=0; i<canvas.width; i+=80) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke(); }
-    for(let i=0; i<canvas.height; i+=80) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(canvas.width,i); ctx.stroke(); }
-
-    // 5b. Layering System (CRITICAL PRO TECHNIQUE: Y-SORTING)
-    // We combine all entities into one list and sort them by their Y-coordinate.
-    let entitiesToLayer = [
-        ...treePool.map(t => ({...t, type:'tree'})),
-        ...EntityPools.enemies.map(e => ({...e, type:'enemy'})),
-        ...EntityPools.walls.map(w => ({...w, type:'wall'})),
-        ...EntityPools.drops.map(d => ({...d, type:'drop'})),
-        {...Player, type:'player'},
-        {...Reactor, type:'reactor'}
-    ];
-
-    // Professional Depth Calculation (Y-sorting)
-    entitiesToLayer.sort((a, b) => (a.y - b.y));
-
-    // 5c. Render Loop
-    entitiesToLayer.forEach(obj => {
-        
-        if (obj.type === 'tree') {
-            // Shadow (Simple Oval)
-            ctx.fillStyle = "rgba(0,0,0,0.1)"; ctx.beginPath(); ctx.ellipse(obj.x, obj.y + 60, 40, 15, 0, 0, Math.PI*2); ctx.fill();
-            // Tree Body (Placeholder placeholder for `Sprites.Tree`)
-            ctx.fillStyle = Sprites.Tree.color;
-            ctx.beginPath();
-            ctx.moveTo(obj.x, obj.y-80); // Point
-            ctx.lineTo(obj.x+30, obj.y); // Bottom Right
-            ctx.lineTo(obj.x-30, obj.y); // Bottom Left
-            ctx.fill();
-        }
-
-        if (obj.type === 'enemy') {
-            // Shadow
-            ctx.fillStyle = "rgba(0,0,0,0.2)"; ctx.beginPath(); ctx.ellipse(obj.x, obj.y + 15, 18, 6, 0, 0, Math.PI*2); ctx.fill();
-            // alien blob
-            ctx.fillStyle = Sprites.BlueGuy.color; ctx.beginPath(); ctx.arc(obj.x, obj.y, 20, 0, Math.PI*2); ctx.fill();
-            // Eyes
-            ctx.fillStyle = '#fff'; ctx.fillRect(obj.x - 8, obj.y - 5, 5, 5); ctx.fillRect(obj.x + 3, obj.y - 5, 5, 5);
-        }
-
-        if (obj.type === 'reactor') {
-            // Ground Shadow Circle (Like ad)
-            ctx.fillStyle = "rgba(0,255,100,0.3)"; ctx.beginPath(); ctx.arc(obj.x, obj.y+60, 80, 0, Math.PI*2); ctx.fill();
-            // Tower Placeholder (Must become `Sprites.Reactor`)
-            ctx.fillStyle = Sprites.Reactor.color; ctx.fillRect(obj.x - 60, obj.y - 120, 120, 180);
-            // Energy Core FX
-            ctx.fillStyle = "#ff5722"; ctx.fillRect(obj.x - 30, obj.y + 10, 60, 40);
-        }
-
-        if (obj.type === 'player') {
-            ctx.fillStyle = Sprites.Player.color; ctx.beginPath(); ctx.arc(obj.x, obj.y, 30, 0, Math.PI*2); ctx.fill();
-            // Simple laser guide
-            ctx.strokeStyle = "rgba(255,255,255,0.15)"; ctx.setLineDash([5, 15]); ctx.beginPath(); ctx.moveTo(obj.x, obj.y); ctx.lineTo(Player.targetX, Player.targetY); ctx.stroke(); ctx.setLineDash([]);
-        }
-
-        if (obj.type === 'wall') {
-            ctx.fillStyle = Sprites.Wall.color; ctx.fillRect(obj.x-40, obj.y-40, 80, 80);
-            ctx.strokeStyle = "#5d2906"; ctx.strokeRect(obj.x-40, obj.y-40, 80, 80);
-        }
-
-        if (obj.type === 'drop') {
-            ctx.save(); ctx.translate(obj.x, obj.y); ctx.rotate(obj.angle);
-            ctx.fillStyle = '#d2b48c'; ctx.fillRect(-15, -8, 30, 16);
-            ctx.restore();
-        }
-    });
-
-    // 5d. FX & TOP LAYERS (Always on top)
-    ctx.fillStyle = "yellow";
-    EntityPools.bullets.forEach(b => ctx.fillRect(b.x-3, b.y-3, 6, 6)); // High speed dots
-
-    ctx.fillStyle = "#fff";
-    EntityPools.particles.forEach(p => {
-        ctx.fillStyle = p.color; ctx.globalAlpha = p.life;
-        ctx.fillRect(p.x - p.size/2, p.y - p.size/2, p.size, p.size);
-    });
-    ctx.globalAlpha = 1; // RESET
-
-    ctx.restore(); // Camera shake end
+    // Top Rim
+    ctx.fillStyle = "#2d3436";
+    ctx.beginPath(); ctx.ellipse(0, -65, 42, 12, 0, 0, Math.PI*2); ctx.fill();
+    // Inner Glow
+    ctx.fillStyle = "#74b9ff";
+    ctx.beginPath(); ctx.ellipse(0, -65, 30, 8, 0, 0, Math.PI*2); ctx.fill();
+    ctx.restore();
 }
 
-// 6. INITIALIZATION & MAIN LOOP
-function gameTick() {
-    updateGame();
-    drawGame();
-    if (gameState.reactorHP > 0) requestAnimationFrame(gameTick);
-    else {
-        // Simple GameOver State (Requires polish)
-        ctx.fillStyle = "rgba(0,0,0,0.8)"; ctx.fillRect(0,0, canvas.width, canvas.height);
-        ctx.fillStyle = "#fff"; ctx.font = "60px Rubik, sans-serif"; ctx.fillText("REACTOR OVERLOADED", canvas.width/2 - 300, canvas.height/2);
+function drawPlayer(ctx, x, y, anim) {
+    ctx.save();
+    ctx.translate(x, y + Math.sin(anim)*5);
+    // Shadow
+    ctx.fillStyle = "rgba(0,0,0,0.2)";
+    ctx.beginPath(); ctx.ellipse(0, 20, 25, 10, 0, 0, Math.PI*2); ctx.fill();
+    // Body
+    ctx.fillStyle = "#e67e22"; // Orange shirt
+    ctx.fillRect(-15, -20, 30, 35);
+    // Head
+    ctx.fillStyle = "#ffdbac";
+    ctx.beginPath(); ctx.arc(0, -25, 12, 0, Math.PI*2); ctx.fill();
+    // Tool (Gun/Axe)
+    ctx.fillStyle = "#2c3e50";
+    ctx.fillRect(10, -10, 25, 8);
+    ctx.restore();
+}
+
+function drawEnemy(ctx, x, y, frame) {
+    ctx.save();
+    ctx.translate(x, y + Math.sin(frame*0.2)*3);
+    // Shadow
+    ctx.fillStyle = "rgba(0,0,0,0.2)";
+    ctx.beginPath(); ctx.ellipse(0, 15, 15, 5, 0, 0, Math.PI*2); ctx.fill();
+    // Body
+    ctx.fillStyle = "#3498db";
+    ctx.beginPath(); ctx.arc(0, 0, 18, 0, Math.PI*2); ctx.fill();
+    // Eyes (Animated)
+    ctx.fillStyle = "white";
+    let eyeSize = Math.sin(frame*0.1) > 0.9 ? 1 : 4;
+    ctx.fillRect(-8, -4, eyeSize, 4); ctx.fillRect(4, -4, eyeSize, 4);
+    ctx.restore();
+}
+
+// --- INITIALIZATION ---
+function init() {
+    // Generate Dense Forest Boundary
+    for(let i=0; i<60; i++) {
+        let side = Math.random() > 0.5;
+        trees.push({
+            x: side ? Math.random()*300 : canvas.width - Math.random()*300,
+            y: Math.random() * canvas.height,
+            type: 'tree'
+        });
+    }
+    // Top boundary
+    for(let i=0; i<20; i++) {
+        trees.push({ x: Math.random()*canvas.width, y: Math.random()*200, type: 'tree' });
     }
 }
 
-// Start immediately (since we have placeholders)
-gameTick();
+// --- GAME LOGIC ---
+function spawnParticles(x, y, color, count) {
+    for(let i=0; i<count; i++) {
+        particles.push({
+            x, y, vx: (Math.random()-0.5)*10, vy: (Math.random()-0.5)*10,
+            life: 1.0, color, size: Math.random()*5+2
+        });
+    }
+}
 
+function setBuildMode(mode) {
+    if(state.wood >= CONFIG.WOOD_COST_WALL) {
+        state.buildMode = mode;
+    }
+}
+
+canvas.addEventListener('mousemove', e => {
+    const r = canvas.getBoundingClientRect();
+    player.tx = e.clientX - r.left;
+    player.ty = e.clientY - r.top;
+});
+
+canvas.addEventListener('mousedown', e => {
+    if(state.buildMode === 'wall') {
+        buildings.push({ x: player.tx, y: player.ty, hp: 200, type: 'wall' });
+        state.wood -= CONFIG.WOOD_COST_WALL;
+        state.buildMode = null;
+        spawnParticles(player.tx, player.ty, "#8B4513", 15);
+        return;
+    }
+    
+    // Shoot
+    let ang = Math.atan2(player.ty - player.y, player.tx - player.x);
+    bullets.push({
+        x: player.x, y: player.y,
+        vx: Math.cos(ang) * 12, vy: Math.sin(ang) * 12
+    });
+});
+
+function update() {
+    if(state.gameOver) return;
+    state.frame++;
+    
+    // Player Move
+    let dx = player.tx - player.x;
+    let dy = player.ty - player.y;
+    player.x += dx * 0.1;
+    player.y += dy * 0.1;
+    if(Math.hypot(dx, dy) > 5) player.anim += 0.2;
+
+    // Enemy Spawn
+    if(state.frame % CONFIG.ENEMY_SPAWN_RATE === 0) {
+        let ang = Math.random() * Math.PI * 2;
+        enemies.push({
+            x: CONFIG.REACTOR_X + Math.cos(ang) * 800,
+            y: CONFIG.REACTOR_Y + Math.sin(ang) * 800,
+            hp: 2, speed: 1.2 + (state.frame/5000)
+        });
+    }
+
+    // Bullet Logic
+    bullets.forEach((b, bi) => {
+        b.x += b.vx; b.y += b.vy;
+        if(b.x < 0 || b.x > canvas.width || b.y < 0 || b.y > canvas.height) bullets.splice(bi, 1);
+        
+        enemies.forEach((en, ei) => {
+            if(Math.hypot(b.x - en.x, b.y - en.y) < 25) {
+                en.hp--;
+                bullets.splice(bi, 1);
+                spawnParticles(en.x, en.y, "#3498db", 5);
+                if(en.hp <= 0) {
+                    enemies.splice(ei, 1);
+                    drops.push({ x: en.x, y: en.y, vx: (Math.random()-0.5)*5, vy: -5, grav: 0.5, ground: en.y + 20 });
+                }
+            }
+        });
+    });
+
+    // Enemy AI
+    enemies.forEach((en, ei) => {
+        // Target priority: Walls then Reactor
+        let target = { x: CONFIG.REACTOR_X, y: CONFIG.REACTOR_Y };
+        buildings.forEach(b => {
+            if(Math.hypot(en.x - b.x, en.y - b.y) < 150) target = b;
+        });
+
+        let ang = Math.atan2(target.y - en.y, target.x - en.x);
+        en.x += Math.cos(ang) * en.speed;
+        en.y += Math.sin(ang) * en.speed;
+
+        // Damage Buildings
+        buildings.forEach((b, bi) => {
+            if(Math.hypot(en.x - b.x, en.y - b.y) < 40) {
+                b.hp -= 0.5;
+                if(b.hp <= 0) buildings.splice(bi, 1);
+            }
+        });
+
+        // Damage Reactor
+        if(Math.hypot(en.x - CONFIG.REACTOR_X, en.y - CONFIG.REACTOR_Y) < 60) {
+            state.hp -= 0.1;
+            state.shake = 10;
+            if(state.hp <= 0) state.gameOver = true;
+        }
+    });
+
+    // Drops & Collection
+    drops.forEach((d, di) => {
+        d.x += d.vx; d.y += d.vy;
+        if(d.y < d.ground) d.vy += d.grav; else { d.vy = 0; d.vx = 0; }
+        
+        if(Math.hypot(player.x - d.x, player.y - d.y) < 40) {
+            state.wood += 5;
+            drops.splice(di, 1);
+        }
+    });
+
+    // Particles
+    particles.forEach((p, pi) => {
+        p.x += p.vx; p.y += p.vy; p.life -= 0.02;
+        if(p.life <= 0) particles.splice(pi, 1);
+    });
+
+    // Shake decay
+    state.shake *= 0.9;
+    
+    // UI
+    document.getElementById('wood-ui').innerText = state.wood;
+    document.getElementById('hp-fill').style.width = state.hp + '%';
+}
+
+function draw() {
+    ctx.save();
+    if(state.shake > 1) ctx.translate(Math.random()*state.shake, Math.random()*state.shake);
+
+    // Ground
+    ctx.fillStyle = "#2d5a27"; ctx.fillRect(0,0, canvas.width, canvas.height);
+    
+    // Grid Lines
+    ctx.strokeStyle = "rgba(0,0,0,0.05)";
+    for(let i=0; i<canvas.width; i+=CONFIG.GRID_SIZE) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,canvas.height); ctx.stroke(); }
+    for(let i=0; i<canvas.height; i+=CONFIG.GRID_SIZE) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(canvas.width,i); ctx.stroke(); }
+
+    // Y-SORTING ENGINE
+    let world = [
+        ...trees,
+        ...enemies.map(e => ({...e, type:'enemy'})),
+        ...buildings.map(b => ({...b, type:'building'})),
+        ...drops.map(d => ({...d, type:'drop'})),
+        { x: player.x, y: player.y, type: 'player' },
+        { x: CONFIG.REACTOR_X, y: CONFIG.REACTOR_Y, type: 'reactor' }
+    ];
+    world.sort((a, b) => a.y - b.y);
+
+    world.forEach(obj => {
+        if(obj.type === 'tree') drawTree(ctx, obj.x, obj.y);
+        if(obj.type === 'reactor') drawReactor(ctx, obj.x, obj.y);
+        if(obj.type === 'player') drawPlayer(ctx, obj.x, obj.y, player.anim);
+        if(obj.type === 'enemy') drawEnemy(ctx, obj.x, obj.y, state.frame);
+        if(obj.type === 'building') {
+            ctx.fillStyle = "#8B4513"; ctx.fillRect(obj.x-30, obj.y-30, 60, 60);
+            ctx.strokeStyle = "#5d4037"; ctx.lineWidth = 4; ctx.strokeRect(obj.x-30, obj.y-30, 60, 60);
+        }
+        if(obj.type === 'drop') {
+            ctx.fillStyle = "#d2b48c"; ctx.beginPath(); ctx.arc(obj.x, obj.y, 8, 0, Math.PI*2); ctx.fill();
+        }
+    });
+
+    // FX
+    ctx.fillStyle = "yellow"; bullets.forEach(b => ctx.fillRect(b.x-4, b.y-4, 8, 8));
+    particles.forEach(p => {
+        ctx.globalAlpha = p.life; ctx.fillStyle = p.color;
+        ctx.fillRect(p.x, p.y, p.size, p.size);
+    });
+    ctx.globalAlpha = 1;
+
+    // Build Ghost
+    if(state.buildMode === 'wall') {
+        ctx.fillStyle = "rgba(46, 204, 113, 0.3)";
+        ctx.fillRect(player.tx-30, player.ty-30, 60, 60);
+    }
+
+    ctx.restore();
+
+    if(state.gameOver) {
+        ctx.fillStyle = "rgba(0,0,0,0.8)"; ctx.fillRect(0,0, canvas.width, canvas.height);
+        ctx.fillStyle = "white"; ctx.font = "80px Bangers"; ctx.textAlign = "center";
+        ctx.fillText("BASE OVERRUN!", canvas.width/2, canvas.height/2);
+    }
+}
+
+function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+init();
+loop();
 </script>
 </body>
 </html>
